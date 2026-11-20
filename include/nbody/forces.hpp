@@ -6,12 +6,12 @@
 
 namespace nbody {
 
-// Gravitational constant is 1: lengths, masses and times are in N-body units.
 enum class ForceMethod {
     direct,  // every pair, O(N^2)
     tree,    // Barnes-Hut octree with monopole cells, O(N log N)
 };
 
+// Gravitational constant is 1: lengths, masses and times are in N-body units.
 struct ForceConfig {
     // Plummer softening length, zero or more.
     double softening = 0.0;

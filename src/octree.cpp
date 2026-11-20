@@ -1,9 +1,9 @@
 #include <algorithm>
 #include <array>
-#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <span>
 #include <utility>
 #include <vector>
@@ -17,15 +17,20 @@ namespace {
 // Cells are subdivided to at most this depth, so a Morton key of three bits
 // per level fits in 63 bits.
 constexpr unsigned MAX_DEPTH = 21;
-constexpr double CELLS_PER_AXIS = 2097152.0;  // 2^MAX_DEPTH
+constexpr double CELLS_PER_AXIS = static_cast<double>(std::uint64_t{1} << MAX_DEPTH);
 constexpr double LAST_CELL_COORDINATE = CELLS_PER_AXIS - 1.0;
 
 // Cells holding at most this many particles are not subdivided.
 constexpr std::size_t LEAF_CAPACITY = 8;
 
 // A walk pops one cell and pushes at most eight, so the stack holds at most
-// 7 * MAX_DEPTH + 1 entries.
+// 7 * MAX_DEPTH + 1 entries, within this capacity.
+// Node and particle indices are 32-bit: a tree has at most MAX_DEPTH + 1 cells
+// per particle.
 constexpr std::size_t WALK_STACK_CAPACITY = std::size_t{8} * MAX_DEPTH;
+
+static_assert(MAX_PARTICLES * (MAX_DEPTH + 1) <= std::numeric_limits<std::uint32_t>::max(),
+              "cell and particle indices must fit in 32 bits");
 
 struct Node {
     Vec3 centre_of_mass;
@@ -91,71 +96,76 @@ public:
     // Requires at least one particle.
     explicit Octree(const ParticleSet& particles);
 
-    // Acceleration of the particle at the given position in tree order.
+    // Acceleration of the particle at the given index in tree order.
     [[nodiscard]] Vec3 acceleration_on(std::size_t index, double softening_squared, double theta) const;
 
-    // Position of the tree-order particle in the caller's order.
+    // Index in the caller's order of the particle at the given tree-order index.
     [[nodiscard]] std::uint32_t original_index(std::size_t index) const { return original_index_[index]; }
 
 private:
-    void sort_particles(const ParticleSet& particles, const Box& box);
-    void subdivide();
+    // Returns the Morton key of each particle, in tree order.
+    std::vector<std::uint64_t> sort_particles(const ParticleSet& particles, const Box& box);
+    void subdivide(const std::vector<std::uint64_t>& keys);
     void accumulate_mass();
 
     std::vector<Node> nodes_;
     std::vector<Vec3> positions_;
     std::vector<double> masses_;
-    std::vector<std::uint64_t> keys_;
     std::vector<std::uint32_t> original_index_;
 };
 
 Octree::Octree(const ParticleSet& particles) {
     const Box box = bounding_cube(particles.positions());
-    sort_particles(particles, box);
+    const std::vector<std::uint64_t> keys = sort_particles(particles, box);
     Node root;
     root.centre = box.origin + (0.5 * box.edge) * Vec3{1.0, 1.0, 1.0};
     root.size = box.edge;
     root.count = static_cast<std::uint32_t>(particles.size());
     nodes_.push_back(root);
-    subdivide();
+    subdivide(keys);
     accumulate_mass();
 }
 
-void Octree::sort_particles(const ParticleSet& particles, const Box& box) {
+std::vector<std::uint64_t> Octree::sort_particles(const ParticleSet& particles, const Box& box) {
     const std::size_t count = particles.size();
-    // Zero or overflowing extent, or one so small the scale overflows: every
-    // particle shares a cell and the tree degenerates to one deep chain.
+    // A zero or overflowing extent, or one so small that the scale overflows,
+    // gives every particle key 0, so the tree is one deep chain and every
+    // pair is summed individually or as a cell far from the particle.
     const double scale = CELLS_PER_AXIS / box.edge;
-    const bool has_scale = scale > 0.0 && std::isfinite(scale);
+    const bool scale_is_usable = scale > 0.0 && std::isfinite(scale);
     std::vector<std::pair<std::uint64_t, std::uint32_t>> keyed(count);
     for (std::size_t i = 0; i < count; ++i) {
-        const std::uint64_t key = has_scale ? morton_key(particles.positions()[i], box, scale) : 0;
+        const std::uint64_t key =
+            scale_is_usable ? morton_key(particles.positions()[i], box, scale) : 0;
         keyed[i] = {key, static_cast<std::uint32_t>(i)};
     }
     // Ties break on the original index, so the order is the same everywhere.
     std::ranges::sort(keyed);
-    keys_.reserve(count);
     original_index_.reserve(count);
     positions_.reserve(count);
     masses_.reserve(count);
+    std::vector<std::uint64_t> keys;
+    keys.reserve(count);
     for (const auto& [key, index] : keyed) {
-        keys_.push_back(key);
+        keys.push_back(key);
         original_index_.push_back(index);
         positions_.push_back(particles.positions()[index]);
         masses_.push_back(particles.masses()[index]);
     }
+    return keys;
 }
 
 // Builds level by level, so the children of a cell are contiguous and always
 // come after it.
-void Octree::subdivide() {
+void Octree::subdivide(const std::vector<std::uint64_t>& keys) {
     for (std::size_t n = 0; n < nodes_.size(); ++n) {
+        // A copy: the pushes below can reallocate nodes_.
         const Node parent = nodes_[n];
         if (parent.count <= LEAF_CAPACITY || parent.depth == MAX_DEPTH) {
             continue;
         }
         const unsigned shift = 3 * (MAX_DEPTH - 1 - parent.depth);
-        const auto octant = [&](std::size_t k) { return (keys_[k] >> shift) & 7U; };
+        const auto octant = [&](std::size_t k) { return (keys[k] >> shift) & 7U; };
         const std::size_t first_child = nodes_.size();
         const std::size_t end = static_cast<std::size_t>(parent.first) + parent.count;
         for (std::size_t begin = parent.first; begin < end;) {
@@ -231,7 +241,6 @@ Vec3 Octree::acceleration_on(std::size_t index, double softening_squared, double
             sum += pair_acceleration(offset, node.mass, softening_squared);
             continue;
         }
-        assert(depth + node.child_count <= WALK_STACK_CAPACITY);
         for (std::size_t c = 0; c < node.child_count; ++c) {
             stack.at(depth++) = static_cast<std::uint32_t>(node.first_child + c);
         }

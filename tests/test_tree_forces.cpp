@@ -81,7 +81,7 @@ TEST_CASE("tree force error against direct summation stays within the measured b
     const double thetas[] = {0.3, 0.5, 0.7, 1.0};
     const double median_bounds[] = {1e-3, 2e-3, 3e-3, 1e-2};
     double previous_median = 0.0;
-    for (std::size_t t = 0; t < 4; ++t) {
+    for (std::size_t t = 0; t < std::size(thetas); ++t) {
         const auto errors = relative_errors(particles, softening, thetas[t]);
         const double median = quantile(errors, 0.5);
         INFO("theta " << thetas[t] << " median " << median);
@@ -116,7 +116,7 @@ TEST_CASE("coincident particles feel no force and stay finite") {
     }
 }
 
-TEST_CASE("particles sharing the deepest cell are summed individually") {
+TEST_CASE("particles crowded into the deepest cell stay in one leaf") {
     // A lattice fixes the box at the unit cube. The cluster sits in the middle
     // of one cell of width 2^-21, so every member shares a leaf at maximum depth.
     std::vector<Vec3> positions;
@@ -133,11 +133,22 @@ TEST_CASE("particles sharing the deepest cell are summed individually") {
 
 TEST_CASE("an overflowing extent gives non-finite values as direct summation does") {
     constexpr double HUGE_COORDINATE = 1e308;
-    const ParticleSet set({{-HUGE_COORDINATE, 0, 0}, {HUGE_COORDINATE, 0, 0}}, {{}, {}},
-                          {1.0, 1.0});
-    const auto tree = compute_accelerations(set, tree_config(0.0, 0.5));
-    REQUIRE_FALSE(std::isfinite(tree[0].x));
+    std::vector<Vec3> positions(16, Vec3{HUGE_COORDINATE, 0, 0});
+    positions[0] = {-HUGE_COORDINATE, 0, 0};
+    const ParticleSet set(positions, std::vector<Vec3>(16), std::vector<double>(16, 1.0));
+    REQUIRE_FALSE(std::isfinite(compute_accelerations(set, tree_config(0.0, 0.5))[0].x));
     REQUIRE_FALSE(std::isfinite(compute_accelerations(set, ForceConfig{})[0].x));
+}
+
+TEST_CASE("an extent too small to scale gives finite forces") {
+    std::vector<Vec3> positions;
+    for (int i = 0; i < 16; ++i) {
+        positions.push_back({i * 1e-320, 0, 0});
+    }
+    const ParticleSet set(positions, std::vector<Vec3>(16), std::vector<double>(16, 1.0));
+    for (const Vec3& a : compute_accelerations(set, tree_config(0.01, 0.5))) {
+        REQUIRE(nbody::is_finite(a));
+    }
 }
 
 TEST_CASE("rejects an opening angle outside zero to one, naming it") {
@@ -149,4 +160,10 @@ TEST_CASE("rejects an opening angle outside zero to one, naming it") {
     REQUIRE_THROWS_OF(
         compute_accelerations(set, tree_config(0.0, std::numeric_limits<double>::quiet_NaN())),
         std::invalid_argument, "got nan");
+}
+
+TEST_CASE("rejects an opening angle outside zero to one for direct summation too") {
+    const ParticleSet set({{}}, {{}}, {1.0});
+    REQUIRE_THROWS_OF(compute_accelerations(set, ForceConfig{0.0, ForceMethod::direct, 2.0}),
+                      std::invalid_argument, "got 2");
 }
