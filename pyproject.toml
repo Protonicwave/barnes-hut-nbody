@@ -65,3 +65,18 @@ max-complexity = 10
 [tool.mypy]
 strict = true
 files = ["python"]
+
+[tool.cibuildwheel]
+build = "cp310-* cp311-* cp312-* cp313-* cp314-*"
+skip = "*-musllinux_* *-win32 *_i686"
+test-extras = ["test"]
+test-command = "pytest {project}/python/tests -q"
+build-verbosity = 1
+
+[tool.cibuildwheel.windows]
+before-build = "pip install delvewheel"
+repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.macos]
+before-all = "brew install libomp"
+environment = { MACOSX_DEPLOYMENT_TARGET = "15.0", OpenMP_ROOT = "/opt/homebrew/opt/libomp" }
