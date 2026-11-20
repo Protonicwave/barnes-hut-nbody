@@ -60,6 +60,9 @@ describe("both builds", () => {
       };
       assert.throws(() => create("spiral"), /setup.*"spiral"/);
       assert.throws(() => create("plummer", 0), /count.*got 0/);
+      assert.throws(() => create("plummer", -1), /count.*got -1/);
+      assert.throws(() => create("plummer", 2.5), /count.*got 2\.5/);
+      assert.throws(() => create("plummer", 256, -1), /seed.*got -1/);
       assert.throws(() => create("plummer", module.MAX_PARTICLES + 1), /count.*got 65537/);
       assert.throws(() => create("plummer", 256, 1, "fmm"), /method.*"fmm"/);
       assert.throws(() => create("plummer", 256, 1, "tree", 1.5), /1\.5/);

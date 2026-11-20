@@ -6,7 +6,6 @@ const SEED = 1;
 const THETA = 0.5;
 const TIMESTEP = 1 / 128;
 const STEPS = 16;
-const STEPS_PER_CALL = 4;
 
 // Threaded builds need cross-origin isolation for shared memory.
 const variant = self.crossOriginIsolated ? "threads" : "single";
@@ -20,17 +19,16 @@ async function run() {
   const softening = 4 / Math.sqrt(PARTICLE_COUNT);
   const simulation = module.Simulation.create(
     "plummer", PARTICLE_COUNT, SEED, "tree", THETA, softening, TIMESTEP, threads);
-  const start = performance.now();
-  for (let taken = 0; taken < STEPS; taken += STEPS_PER_CALL) {
-    simulation.step(STEPS_PER_CALL);
-  }
-  const elapsedMs = performance.now() - start;
-  const initial = simulation.initialEnergy();
-  const drift = Math.abs(simulation.energy() - initial) / Math.abs(initial);
-  postMessage({ type: "done", steps: STEPS, stepMs: elapsedMs / STEPS, drift });
-  simulation.delete();
-  if (module.PThread) {
-    module.PThread.terminateAllThreads();
+  try {
+    const start = performance.now();
+    simulation.step(STEPS);
+    const elapsedMs = performance.now() - start;
+    const initial = simulation.initialEnergy();
+    const drift = Math.abs(simulation.energy() - initial) / Math.abs(initial);
+    postMessage({ type: "done", steps: STEPS, stepMs: elapsedMs / STEPS, drift });
+  } finally {
+    simulation.delete();
+    module.PThread?.terminateAllThreads();
   }
 }
 

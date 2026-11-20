@@ -48,11 +48,11 @@ void parallel_for(std::size_t count, unsigned thread_count, const Body& body) {
     };
 
     const std::size_t chunk_count = (count + chunk - 1) / chunk;
-    const std::size_t helper_count = std::min<std::size_t>(thread_count, chunk_count);
+    const std::size_t total_threads = std::min<std::size_t>(thread_count, chunk_count);
     std::vector<std::thread> helpers;
-    if (helper_count > 1) {
-        helpers.reserve(helper_count - 1);
-        for (std::size_t t = 1; t < helper_count; ++t) {
+    if (total_threads > 1) {
+        helpers.reserve(total_threads - 1);
+        for (std::size_t t = 1; t < total_threads; ++t) {
             helpers.emplace_back(drain);
         }
     }

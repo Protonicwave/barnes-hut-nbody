@@ -20,8 +20,9 @@ if(EMSCRIPTEN)
     -sINITIAL_MEMORY=268435456 -sSTACK_SIZE=1048576)
   if(NBODY_WASM_THREADS)
     list(APPEND NBODY_WASM_FLAGS -pthread)
+    # The calling thread works too, so 8 threads need 7 workers.
     list(APPEND NBODY_WASM_LINK_FLAGS -pthread
-      -sPTHREAD_POOL_SIZE=8 -sDEFAULT_PTHREAD_STACK_SIZE=1048576)
+      -sPTHREAD_POOL_SIZE=7 -sDEFAULT_PTHREAD_STACK_SIZE=1048576)
   endif()
   add_compile_options(${NBODY_WASM_FLAGS})
   add_link_options(${NBODY_WASM_LINK_FLAGS})

@@ -5,8 +5,10 @@
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -27,17 +29,24 @@ constexpr std::size_t MAX_BROWSER_PARTICLES = 65536;
 // threaded build, one in the single-threaded build.
 constexpr unsigned MAX_BROWSER_THREADS = NBODY_WASM_MAX_THREADS;
 
-// Keeps one call short enough that the worker can still answer messages.
+// Bounds one call: a step at the largest count takes about 0.6 s on one thread.
 constexpr std::size_t MAX_STEPS_PER_CALL = 1024;
 
 // Eccentricity and semi-major axis of the Kepler setup.
 constexpr double KEPLER_ECCENTRICITY = 0.5;
 constexpr double KEPLER_SEMI_MAJOR_AXIS = 1.0;
 
-std::string describe_limits(const char* what, std::size_t lowest, std::size_t highest,
-                            std::size_t got) {
-    return std::string(what) + " must be from " + std::to_string(lowest) + " to " +
-           std::to_string(highest) + ", got " + std::to_string(got);
+// JavaScript numbers reach Embind as doubles, and Embind would truncate or wrap
+// them into an integer type before any check, so integers are read as doubles.
+std::size_t whole_number(const char* what, double value, std::size_t lowest,
+                         std::size_t highest) {
+    if (!(value >= static_cast<double>(lowest) && value <= static_cast<double>(highest)) ||
+        value != std::floor(value)) {
+        throw std::invalid_argument(std::string(what) + " must be a whole number from " +
+                                    std::to_string(lowest) + " to " + std::to_string(highest) +
+                                    ", got " + std::to_string(value));
+    }
+    return static_cast<std::size_t>(value);
 }
 
 nbody::ForceMethod parse_method(const std::string& name) {
@@ -50,7 +59,7 @@ nbody::ForceMethod parse_method(const std::string& name) {
     throw std::invalid_argument(R"(method must be "direct" or "tree", got ")" + name + "\"");
 }
 
-nbody::ParticleSet make_particles(const std::string& setup, std::size_t count,
+nbody::ParticleSet make_particles(const std::string& setup, double count,
                                   std::uint32_t seed) {
     if (setup == "kepler") {
         return nbody::kepler_binary(KEPLER_ECCENTRICITY, KEPLER_SEMI_MAJOR_AXIS);
@@ -59,11 +68,9 @@ nbody::ParticleSet make_particles(const std::string& setup, std::size_t count,
         throw std::invalid_argument(
             R"(setup must be "plummer", "collapse" or "kepler", got ")" + setup + "\"");
     }
-    if (count < 1 || count > MAX_BROWSER_PARTICLES) {
-        throw std::invalid_argument(describe_limits("count", 1, MAX_BROWSER_PARTICLES, count));
-    }
-    return setup == "plummer" ? nbody::plummer_sphere(count, seed)
-                              : nbody::uniform_sphere(count, seed);
+    const std::size_t particle_count = whole_number("count", count, 1, MAX_BROWSER_PARTICLES);
+    return setup == "plummer" ? nbody::plummer_sphere(particle_count, seed)
+                              : nbody::uniform_sphere(particle_count, seed);
 }
 
 emscripten::val view_of(std::span<const nbody::Vec3> vectors) {
@@ -75,12 +82,11 @@ emscripten::val view_of(std::span<const nbody::Vec3> vectors) {
 
 // Runs an operation and turns a standard exception into a JavaScript Error.
 template <typename Operation>
-auto as_js_error(Operation&& operation) -> decltype(operation()) {
+auto rethrow_as_js_error(Operation&& operation) -> decltype(operation()) {
     try {
         return std::forward<Operation>(operation)();
     } catch (const std::exception& error) {
         emscripten::val::global("Error").new_(std::string(error.what())).throw_();
-        throw;  // throw_ does not return; this keeps the compiler's flow analysis honest
     }
 }
 
@@ -89,30 +95,27 @@ public:
     // Throws an Error for an unknown setup or method, a count outside 1 to
     // MAX_BROWSER_PARTICLES, a thread count outside 1 to the build's limit, or
     // any value the core rejects.
-    static Simulation create(const std::string& setup, std::size_t count, std::uint32_t seed,
+    static Simulation create(const std::string& setup, double count, double seed,
                              const std::string& method, double theta, double softening,
-                             double timestep, unsigned threads) {
-        return as_js_error([&] {
-            if (threads < 1 || threads > MAX_BROWSER_THREADS) {
-                throw std::invalid_argument(
-                    describe_limits("threads", 1, MAX_BROWSER_THREADS, threads));
-            }
+                             double timestep, double threads) {
+        return rethrow_as_js_error([&] {
+            const auto thread_count = static_cast<unsigned>(
+                whole_number("threads", threads, 1, MAX_BROWSER_THREADS));
+            const auto seed_value = static_cast<std::uint32_t>(
+                whole_number("seed", seed, 0, std::numeric_limits<std::uint32_t>::max()));
             const nbody::ForceConfig config{.softening = softening,
                                             .method = parse_method(method),
                                             .theta = theta,
-                                            .thread_count = threads};
-            return Simulation(make_particles(setup, count, seed), config, timestep);
+                                            .thread_count = thread_count};
+            return Simulation(make_particles(setup, count, seed_value), config, timestep);
         });
     }
 
     // Throws an Error unless count is from 1 to MAX_STEPS_PER_CALL, or when a
     // position or velocity becomes non-finite.
-    void step(std::size_t count) {
-        as_js_error([&] {
-            if (count < 1 || count > MAX_STEPS_PER_CALL) {
-                throw std::invalid_argument(describe_limits("steps", 1, MAX_STEPS_PER_CALL, count));
-            }
-            simulation_.step(count);
+    void step(double count) {
+        rethrow_as_js_error([&] {
+            simulation_.step(whole_number("steps", count, 1, MAX_STEPS_PER_CALL));
         });
     }
 

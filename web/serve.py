@@ -19,7 +19,6 @@ ISOLATION_HEADERS = {
 MEDIA_TYPES = {
     ".wasm": "application/wasm",
     ".js": "text/javascript",
-    ".mjs": "text/javascript",
 }
 DEFAULT_PORT = 8000
 

@@ -54,7 +54,7 @@ once. The tests run with `python -m pytest`, after `pip install ".[test,plot]"`.
 ## WebAssembly
 
 The core builds with Emscripten 6.0.6 in two variants. `wasm-threads` runs the
-force loops on `std::thread` workers, a pool of 8 started with the module,
+force loops on `std::thread` workers, a pool of 7 started with the module,
 and `wasm-single` runs them on the calling thread. Results are bitwise
 identical between the two.
 Install emsdk, activate it so that `EMSDK` is set, then from the repository

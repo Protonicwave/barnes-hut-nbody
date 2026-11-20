@@ -14,7 +14,7 @@ import serve
 def running(*, isolated: bool) -> Iterator[str]:
     with TemporaryDirectory() as directory:
         Path(directory, "module.wasm").write_bytes(b"\x00asm")
-        Path(directory, "module.mjs").write_text("export {};\n", encoding="utf-8")
+        Path(directory, "module.js").write_text("export {};\n", encoding="utf-8")
         server = serve.make_server(Path(directory), 0, isolated)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -47,7 +47,7 @@ def test_serves_wasm_and_modules_with_their_media_types() -> None:
     with running(isolated=True) as base:
         with fetch(f"{base}/module.wasm") as reply:
             assert reply.headers["Content-Type"] == "application/wasm"
-        with fetch(f"{base}/module.mjs") as reply:
+        with fetch(f"{base}/module.js") as reply:
             assert reply.headers["Content-Type"] == "text/javascript"
 
 
