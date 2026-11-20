@@ -1,0 +1,29 @@
+{
+ "node": "v26.4.0",
+ "runs": [
+  {
+   "platform": "native",
+   "threads": 1,
+   "count": 16384,
+   "median_ms": 134.1184
+  },
+  {
+   "platform": "native",
+   "threads": 8,
+   "count": 16384,
+   "median_ms": 35.7603
+  },
+  {
+   "platform": "wasm-single",
+   "threads": 1,
+   "count": 16384,
+   "median_ms": 138.5173
+  },
+  {
+   "platform": "wasm-threads",
+   "threads": 8,
+   "count": 16384,
+   "median_ms": 35.9439
+  }
+ ]
+}
