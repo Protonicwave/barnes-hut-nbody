@@ -24,3 +24,9 @@ catch_discover_tests(nbody_tests)
 if(MINGW)
   target_link_options(nbody_tests PRIVATE -static)
 endif()
+
+# Catch2 writes its test listing to a host path. Under Node, raw file system
+# access lets the Emscripten runtime see it.
+if(EMSCRIPTEN)
+  target_link_options(nbody_tests PRIVATE -sNODERAWFS=1)
+endif()

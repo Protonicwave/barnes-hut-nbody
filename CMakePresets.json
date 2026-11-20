@@ -54,7 +54,17 @@
         "CMAKE_BUILD_TYPE": "Release",
         "OpenMP_RUNTIME_MSVC": "llvm"
       }
-    }
+    },
+    {
+      "name": "wasm",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    { "name": "wasm-threads", "inherits": "wasm", "cacheVariables": { "NBODY_WASM_THREADS": "ON" } },
+    { "name": "wasm-single", "inherits": "wasm", "cacheVariables": { "NBODY_WASM_THREADS": "OFF" } }
   ],
   "buildPresets": [
     { "name": "dev", "configurePreset": "dev" },
@@ -62,7 +72,9 @@
     { "name": "release", "configurePreset": "release" },
     { "name": "asan", "configurePreset": "asan" },
     { "name": "tsan", "configurePreset": "tsan" },
-    { "name": "msvc", "configurePreset": "msvc" }
+    { "name": "msvc", "configurePreset": "msvc" },
+    { "name": "wasm-threads", "configurePreset": "wasm-threads" },
+    { "name": "wasm-single", "configurePreset": "wasm-single" }
   ],
   "testPresets": [
     {
@@ -94,6 +106,16 @@
       "name": "msvc", "configurePreset": "msvc", "configuration": "Release",
       "output": { "outputOnFailure": true, "quiet": true },
       "execution": { "noTestsAction": "error" }
+    },
+    {
+      "name": "wasm-threads", "configurePreset": "wasm-threads",
+      "output": { "outputOnFailure": true, "quiet": true },
+      "execution": { "noTestsAction": "error" }
+    },
+    {
+      "name": "wasm-single", "configurePreset": "wasm-single",
+      "output": { "outputOnFailure": true, "quiet": true },
+      "execution": { "noTestsAction": "error" }
     }
   ],
   "workflowPresets": [
@@ -108,6 +130,10 @@
     { "name": "tsan", "steps": [
       { "type": "configure", "name": "tsan" }, { "type": "build", "name": "tsan" }, { "type": "test", "name": "tsan" } ] },
     { "name": "msvc", "steps": [
-      { "type": "configure", "name": "msvc" }, { "type": "build", "name": "msvc" }, { "type": "test", "name": "msvc" } ] }
+      { "type": "configure", "name": "msvc" }, { "type": "build", "name": "msvc" }, { "type": "test", "name": "msvc" } ] },
+    { "name": "wasm-threads", "steps": [
+      { "type": "configure", "name": "wasm-threads" }, { "type": "build", "name": "wasm-threads" }, { "type": "test", "name": "wasm-threads" } ] },
+    { "name": "wasm-single", "steps": [
+      { "type": "configure", "name": "wasm-single" }, { "type": "build", "name": "wasm-single" }, { "type": "test", "name": "wasm-single" } ] }
   ]
 }
