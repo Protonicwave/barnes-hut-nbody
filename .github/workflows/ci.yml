@@ -46,15 +46,19 @@ jobs:
       - run: cmake --workflow --preset wasm-threads
       - run: cmake --workflow --preset wasm-single
       - run: node --test web/test/smoke.mjs
-      - name: Check isolation headers on the local server
+      - name: Check isolation headers on local servers
         run: |
           python3 web/serve.py --port 8000 &
           python3 web/serve.py --port 8001 --no-isolation &
           shellcheck scripts/check_site_headers.sh
           bash scripts/check_site_headers.sh http://127.0.0.1:8000
+          # The second server sends no isolation headers, so the check must fail
+          # on them, not merely because nothing answered.
           status=0
-          bash scripts/check_site_headers.sh http://127.0.0.1:8001 || status=$?
+          output=$(bash scripts/check_site_headers.sh http://127.0.0.1:8001) || status=$?
+          echo "$output"
           test "$status" -eq 1
+          grep -q "Cross-Origin-Opener-Policy: expected" <<< "$output"
 
   sanitisers:
     runs-on: ubuntu-latest
