@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "force_kernels.hpp"
+#include "parallel.hpp"
 
 namespace nbody {
 
@@ -21,7 +22,7 @@ constexpr double CELLS_PER_AXIS = static_cast<double>(std::uint64_t{1} << MAX_DE
 constexpr double LAST_CELL_COORDINATE = CELLS_PER_AXIS - 1.0;
 
 // Cells holding at most this many particles are not subdivided.
-constexpr std::size_t LEAF_CAPACITY = 8;
+constexpr std::size_t LEAF_CAPACITY = 4;
 
 // A walk pops one cell and pushes at most eight, so the stack holds at most
 // 7 * MAX_DEPTH + 1 entries, within this capacity.
@@ -251,15 +252,15 @@ Vec3 Octree::acceleration_on(std::size_t index, double softening_squared, double
 }  // namespace
 
 std::vector<Vec3> tree_accelerations(const ParticleSet& particles, double softening_squared,
-                                     double theta) {
+                                     double theta, unsigned thread_count) {
     if (particles.size() == 0) {
         return {};
     }
     const Octree tree(particles);
     std::vector<Vec3> accelerations(particles.size());
-    for (std::size_t k = 0; k < particles.size(); ++k) {
+    parallel_for(particles.size(), thread_count, [&](std::size_t k) {
         accelerations[tree.original_index(k)] = tree.acceleration_on(k, softening_squared, theta);
-    }
+    });
     return accelerations;
 }
 

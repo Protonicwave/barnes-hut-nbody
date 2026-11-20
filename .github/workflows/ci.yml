@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build
       - run: cmake --workflow --preset dev
+      - run: cmake --workflow --preset release
+      - run: python3 -m unittest discover -s bench -p "test_*.py"
 
   sanitisers:
     runs-on: ubuntu-latest
@@ -25,12 +27,30 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build
       - run: cmake --workflow --preset asan
 
+  threads:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TSAN_OPTIONS: halt_on_error=1 ignore_noninstrumented_modules=1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build clang libomp-dev
+      # libgomp is not instrumented for the thread sanitiser and reports races
+      # that are not there. LLVM's OpenMP runtime is, through the Archer tool.
+      - run: echo "OMP_TOOL_LIBRARIES=$(find /usr/lib/llvm-*/lib -name libarcher.so | head -n 1)" >> "$GITHUB_ENV"
+      - run: |
+          echo "OMP_TOOL_LIBRARIES=$OMP_TOOL_LIBRARIES"
+          cmake --preset tsan
+          cmake --build --preset tsan
+          ctest --test-dir build/tsan --output-on-failure
+
   macos:
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: brew install ninja
+      - run: brew install ninja libomp
+      - run: echo "OpenMP_ROOT=$(brew --prefix libomp)" >> "$GITHUB_ENV"
       - run: cmake --workflow --preset dev
 
   windows:

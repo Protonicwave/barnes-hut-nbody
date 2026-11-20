@@ -1,0 +1,110 @@
+[
+ {
+  "method": "direct",
+  "count": 1024,
+  "threads": 8,
+  "median_ms": 0.8062285719182801
+ },
+ {
+  "method": "direct",
+  "count": 2048,
+  "threads": 8,
+  "median_ms": 2.937470834391813
+ },
+ {
+  "method": "direct",
+  "count": 4096,
+  "threads": 8,
+  "median_ms": 11.700466663266223
+ },
+ {
+  "method": "direct",
+  "count": 8192,
+  "threads": 8,
+  "median_ms": 41.87800001818687
+ },
+ {
+  "method": "direct",
+  "count": 16384,
+  "threads": 8,
+  "median_ms": 183.50479996297508
+ },
+ {
+  "method": "direct",
+  "count": 32768,
+  "threads": 8,
+  "median_ms": 686.3193999743089
+ },
+ {
+  "method": "direct",
+  "count": 65536,
+  "threads": 8,
+  "median_ms": 2738.9691999414936
+ },
+ {
+  "method": "tree",
+  "count": 1024,
+  "threads": 8,
+  "median_ms": 1.0169749998021873
+ },
+ {
+  "method": "tree",
+  "count": 2048,
+  "threads": 8,
+  "median_ms": 2.4164352958620183
+ },
+ {
+  "method": "tree",
+  "count": 4096,
+  "threads": 8,
+  "median_ms": 6.443942858216663
+ },
+ {
+  "method": "tree",
+  "count": 8192,
+  "threads": 8,
+  "median_ms": 17.37114999559708
+ },
+ {
+  "method": "tree",
+  "count": 16384,
+  "threads": 8,
+  "median_ms": 44.73586667639514
+ },
+ {
+  "method": "tree",
+  "count": 32768,
+  "threads": 8,
+  "median_ms": 102.63370000757277
+ },
+ {
+  "method": "tree",
+  "count": 65536,
+  "threads": 1,
+  "median_ms": 896.8014999991283
+ },
+ {
+  "method": "tree",
+  "count": 65536,
+  "threads": 2,
+  "median_ms": 572.8639999870211
+ },
+ {
+  "method": "tree",
+  "count": 65536,
+  "threads": 4,
+  "median_ms": 395.42259997688234
+ },
+ {
+  "method": "tree",
+  "count": 65536,
+  "threads": 8,
+  "median_ms": 253.4365999745205
+ },
+ {
+  "method": "tree",
+  "count": 131072,
+  "threads": 8,
+  "median_ms": 544.1488999640569
+ }
+]

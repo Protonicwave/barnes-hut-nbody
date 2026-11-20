@@ -3,3 +3,4 @@ build/
 *.o
 *.gcda
 *.gcno
+__pycache__/

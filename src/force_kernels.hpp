@@ -16,8 +16,9 @@ inline Vec3 pair_acceleration(const Vec3& offset, double source_mass, double sof
 
 // Both take the configuration already validated, and return accelerations in
 // the order of the particle set.
-std::vector<Vec3> direct_accelerations(const ParticleSet& particles, double softening_squared);
+std::vector<Vec3> direct_accelerations(const ParticleSet& particles, double softening_squared,
+                                       unsigned thread_count);
 std::vector<Vec3> tree_accelerations(const ParticleSet& particles, double softening_squared,
-                                     double theta);
+                                     double theta, unsigned thread_count);
 
 }  // namespace nbody

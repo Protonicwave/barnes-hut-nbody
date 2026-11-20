@@ -8,6 +8,7 @@ FetchContent_MakeAvailable(Catch2)
 add_executable(nbody_tests
   test_diagnostics.cpp
   test_forces.cpp
+  test_parallel.cpp
   test_particles.cpp
   test_setups.cpp
   test_tree_forces.cpp
