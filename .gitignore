@@ -4,3 +4,4 @@ build/
 *.gcda
 *.gcno
 __pycache__/
+web/wasm/

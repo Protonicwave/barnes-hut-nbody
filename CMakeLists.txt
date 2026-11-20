@@ -61,6 +61,10 @@ if(NBODY_BUILD_PYTHON)
   add_subdirectory(python)
 endif()
 
+if(EMSCRIPTEN)
+  add_subdirectory(wasm)
+endif()
+
 if(BUILD_TESTING)
   add_subdirectory(tests)
   if(NBODY_BUILD_BENCH)
