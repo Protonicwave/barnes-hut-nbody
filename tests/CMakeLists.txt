@@ -10,6 +10,7 @@ add_executable(nbody_tests
   test_forces.cpp
   test_particles.cpp
   test_setups.cpp
+  test_tree_forces.cpp
   test_simulation.cpp)
 target_link_libraries(nbody_tests PRIVATE nbody_core nbody_warnings
   Catch2::Catch2WithMain)

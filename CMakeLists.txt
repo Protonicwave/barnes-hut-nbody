@@ -19,7 +19,9 @@ endif()
 
 add_library(nbody_core
   src/particles.cpp
+  src/forces.cpp
   src/direct.cpp
+  src/octree.cpp
   src/simulation.cpp
   src/diagnostics.cpp
   src/setups.cpp)
