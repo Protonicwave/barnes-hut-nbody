@@ -45,8 +45,8 @@ BUILD_TESTING = "OFF"
 OpenMP_RUNTIME_MSVC = "llvm"
 
 [tool.pytest.ini_options]
-testpaths = ["python/tests", "scripts"]
-pythonpath = ["scripts"]
+testpaths = ["python/tests", "scripts", "web"]
+pythonpath = ["scripts", "web"]
 addopts = "-ra --strict-markers"
 
 [tool.ruff]
@@ -57,7 +57,7 @@ target-version = "py310"
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "S", "PT", "N", "C90", "PLR"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["barnes_hut", "plot_results"]
+known-first-party = ["barnes_hut", "plot_results", "serve"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
@@ -67,7 +67,7 @@ max-complexity = 10
 
 [tool.mypy]
 strict = true
-files = ["python", "scripts"]
+files = ["python", "scripts", "web"]
 
 [tool.cibuildwheel]
 build = "cp310-* cp311-* cp312-* cp313-* cp314-*"

@@ -3,8 +3,8 @@
 A gravitational N-body simulator in C++20. Forces come from direct
 summation or a Barnes-Hut octree, both with Plummer softening, and time
 stepping uses kick-drift-kick leapfrog with a fixed timestep. Force loops run
-on OpenMP threads. A Python module wraps the library, and a WebAssembly build
-is planned.
+on OpenMP threads. A Python module wraps the library, and the same core builds to
+WebAssembly for the browser, single-threaded or on worker threads.
 
 Units are N-body units with G = 1. The library provides:
 
@@ -50,6 +50,60 @@ inputs. `plummer_sphere`, `uniform_sphere` and `kepler_binary` return the
 three arrays the constructor takes. `step` holds the Python interpreter lock
 for the whole call, and a `Simulation` must not be used from two threads at
 once. The tests run with `python -m pytest`, after `pip install ".[test,plot]"`.
+
+## WebAssembly
+
+The core builds with Emscripten 6.0.6 in two variants. `wasm-threads` runs the
+force loops on `std::thread` workers, a pool of 7 started with the module,
+and `wasm-single` runs them on the calling thread. Results are bitwise
+identical between the two.
+Install emsdk, activate it so that `EMSDK` is set, then from the repository
+root:
+
+    cmake --workflow --preset wasm-threads
+    cmake --workflow --preset wasm-single
+    node --test web/test/smoke.mjs
+
+Each workflow builds the Catch2 suite and runs it under Node. The Embind
+module is written to `web/wasm/threads/` and `web/wasm/single/`, as
+`nbody.js` and `nbody.wasm`, and the smoke test drives both. The heap is fixed
+at 256 MiB, which holds 65536 particles with the tree or direct summation, the
+limit the module enforces.
+
+```js
+import createModule from "./wasm/threads/nbody.js";
+
+const module = await createModule();
+const simulation = module.Simulation.create(
+  "plummer", 4096, 1, "tree", 0.5, 4 / Math.sqrt(4096), 1 / 128, 8);
+simulation.step(16);
+const positions = simulation.positions(); // Float64Array view of 3 * N doubles
+const error = Math.abs(simulation.energy() - simulation.initialEnergy())
+  / Math.abs(simulation.initialEnergy());
+```
+
+`setup` is `"plummer"`, `"collapse"` or `"kepler"` (two bodies, eccentricity
+0.5, semi-major axis 1, which ignore the count and seed). `step` takes 1 to
+1024 steps. `energy` is the kinetic energy plus the direct softened potential,
+whatever the force method. Invalid arguments throw an `Error` naming the
+value. The views point into the heap, so read them before the next call. The
+threaded build needs a worker: it joins its threads with a blocking wait,
+which a page's main thread may not do, so `web/worker.js` runs the module.
+
+`web/index.html` is a harness page that runs 8192 particles in that worker and
+reports the build, the thread count and the time per step. Threads need
+shared memory, and browsers allow that only on a cross-origin isolated page,
+which means two response headers:
+
+    Cross-Origin-Opener-Policy: same-origin
+    Cross-Origin-Embedder-Policy: require-corp
+
+GitHub Pages cannot send them. `web/_headers` sets them on Cloudflare Pages.
+`python web/serve.py` serves the directory locally with them, and
+`--no-isolation` leaves them out, which shows the page fall back to the
+single-threaded build with a banner saying so. In Chrome on the development
+machine, with the headers the page is isolated and steps 8192 particles at
+13.3 ms per step on 8 threads. Without them it takes 63.8 ms on one.
 
 ## Build and test
 
@@ -109,13 +163,37 @@ The tree's energy error does not depend on the timestep: it is set by the
 opening angle, while direct summation's falls with the square of dt. Draw them
 again with `python scripts/plot_results.py`, which needs the `plot` extra.
 
+### Native against WebAssembly
+
+One tree force evaluation, tree build included, at N = 16384, theta 0.5,
+softening 4/sqrt(N). Medians of 5 repetitions, the native build from the
+`release` preset on the machine above and the Wasm builds under Node 26.4.0.
+
+| build | threads | native (ms) | WebAssembly (ms) | ratio |
+|:--|---:|---:|---:|---:|
+| `wasm-single` | 1 | 134.1 | 138.5 | 1.03 |
+| `wasm-threads` | 8 | 35.8 | 35.9 | 1.01 |
+
+The budgets are a ratio of at most 2.5 on one thread and 3 on eight. The two
+builds do not time the same particles: libc++ and libstdc++ draw different
+numbers from the same seed, so the Plummer sphere is a different realisation of
+the same distribution. Reproduce the figures after building the `release`,
+`wasm-single` and `wasm-threads` presets:
+
+    python bench/check_wasm_budgets.py --native build/release/bench/kernel_timing --wasm-single build/wasm-single/bench/kernel_timing.js --wasm-threads build/wasm-threads/bench/kernel_timing.js --summary results/wasm_timing.json
+
+It prints each ratio beside its budget and exits 1 when either is over. Its
+tests run with `python -m unittest discover -s bench`. The data is
+`results/wasm_timing.json`.
+
 ## Checks
 
     clang-tidy -quiet -p build/dev --extra-arg=--target=x86_64-w64-mingw32 src/*.cpp
-    cppcheck -q --std=c++20 --enable=warning,style,performance,portability,unusedFunction --suppress=useStlAlgorithm --error-exitcode=1 -I include src tests bench
-    ruff check python scripts
+    cppcheck -q --std=c++20 --enable=warning,style,performance,portability,unusedFunction --suppress=useStlAlgorithm --error-exitcode=1 -I include src tests bench python wasm
+    clang-tidy -quiet wasm/bindings.cpp -- -std=c++20 --target=wasm32-unknown-emscripten -fwasm-exceptions -msimd128 -isystem $EMSDK/upstream/emscripten/cache/sysroot/include/c++/v1 -isystem $EMSDK/upstream/emscripten/cache/sysroot/include/compat -isystem $EMSDK/upstream/emscripten/cache/sysroot/include -Iinclude -DNBODY_WASM_MAX_THREADS=8 -D__EMSCRIPTEN__
+    ruff check python scripts web
     mypy
-    vulture python scripts --min-confidence 60
+    vulture python scripts web --min-confidence 60
     cmake --workflow --preset coverage
     gcovr --root . --filter src/direct.cpp --filter src/octree.cpp --filter src/forces.cpp --filter src/simulation.cpp --filter src/diagnostics.cpp --exclude-throw-branches --exclude-unreachable-branches --exclude-noncode-lines --fail-under-line 100 --fail-under-branch 100 build/coverage
 

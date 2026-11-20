@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Barnes-Hut N-body harness</title>
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+  body { margin: 0 auto; max-width: 40rem; padding: 1.5rem 1rem; line-height: 1.5; }
+  h1 { font-size: 1.25rem; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
+  dt { font-weight: 600; }
+  dd { margin: 0; font-variant-numeric: tabular-nums; }
+  #banner { padding: 0.5rem 0.75rem; border: 1px solid; border-radius: 4px; }
+  [hidden] { display: none; }
+</style>
+</head>
+<body>
+<h1>Barnes-Hut N-body harness</h1>
+<p id="banner" hidden>
+  Running on one thread. The page is not cross-origin isolated: send
+  <code>Cross-Origin-Opener-Policy: same-origin</code> and
+  <code>Cross-Origin-Embedder-Policy: require-corp</code> to use threads.
+</p>
+<dl id="result">
+  <dt>Cross-origin isolated</dt><dd id="isolated">checking</dd>
+  <dt>Build</dt><dd id="build">loading</dd>
+  <dt>Setup</dt><dd id="setup">Plummer sphere, tree, theta 0.5</dd>
+  <dt>Particles</dt><dd id="count"></dd>
+  <dt>Threads</dt><dd id="threads"></dd>
+  <dt>Steps taken</dt><dd id="steps"></dd>
+  <dt>Time per step</dt><dd id="step-time"></dd>
+  <dt>Relative energy error</dt><dd id="drift"></dd>
+  <dt>State</dt><dd id="state">running</dd>
+</dl>
+<script type="module" src="harness.js"></script>
+</body>
+</html>
