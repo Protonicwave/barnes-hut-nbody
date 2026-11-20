@@ -21,12 +21,13 @@ classifiers = [
 Source = "https://github.com/Protonicwave/barnes-hut-nbody"
 
 [project.optional-dependencies]
-test = ["pytest>=8", "coverage>=7"]
+test = ["pytest>=8"]
 plot = ["matplotlib>=3.8"]
 
 [tool.scikit-build]
+# OpenMP_RUNTIME_MSVC, which selects /openmp:llvm, is read from CMake 3.30.
+cmake.version = ">=3.30"
 wheel.packages = ["python/barnes_hut"]
-sdist.include = ["python", "include", "src", "CMakeLists.txt", "LICENSE", "README.md"]
 sdist.exclude = [
     ".github",
     ".pytest_cache",
