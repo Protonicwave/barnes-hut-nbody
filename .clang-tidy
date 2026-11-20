@@ -1,0 +1,6 @@
+Checks: '-*,clang-diagnostic-*,bugprone-*,cert-*,clang-analyzer-*,cppcoreguidelines-*,modernize-*,misc-*,performance-*,readability-function-cognitive-complexity,readability-function-size,-modernize-use-trailing-return-type,-cppcoreguidelines-avoid-magic-numbers,-bugprone-easily-swappable-parameters,-misc-include-cleaner,-modernize-use-designated-initializers,-cppcoreguidelines-pro-bounds-avoid-unchecked-container-access'
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'include/nbody/.*'
+CheckOptions:
+  readability-function-cognitive-complexity.Threshold: 15
+  readability-function-size.LineThreshold: 60
