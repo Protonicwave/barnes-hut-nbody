@@ -1,23 +1,13 @@
-#include <cmath>
-#include <format>
-#include <stdexcept>
+#include <cstddef>
+#include <vector>
 
-#include "nbody/forces.hpp"
+#include "force_kernels.hpp"
 
 namespace nbody {
 
-void check_softening(double softening) {
-    if (!std::isfinite(softening) || softening < 0.0) {
-        throw std::invalid_argument(
-            std::format("softening must be finite and not negative, got {}", softening));
-    }
-}
-
-std::vector<Vec3> compute_accelerations(const ParticleSet& particles, const ForceConfig& config) {
-    check_softening(config.softening);
+std::vector<Vec3> direct_accelerations(const ParticleSet& particles, double softening_squared) {
     const auto positions = particles.positions();
     const auto masses = particles.masses();
-    const double softening_squared = config.softening * config.softening;
     std::vector<Vec3> accelerations(particles.size());
     for (std::size_t i = 0; i < particles.size(); ++i) {
         Vec3 sum;
@@ -25,9 +15,7 @@ std::vector<Vec3> compute_accelerations(const ParticleSet& particles, const Forc
             if (j == i) {
                 continue;
             }
-            const Vec3 offset = positions[j] - positions[i];
-            const double distance_squared = dot(offset, offset) + softening_squared;
-            sum += (masses[j] / (distance_squared * std::sqrt(distance_squared))) * offset;
+            sum += pair_acceleration(positions[j] - positions[i], masses[j], softening_squared);
         }
         accelerations[i] = sum;
     }
