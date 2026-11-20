@@ -1,0 +1,5 @@
+cpu=Intel(R) Core(TM) Ultra 5 238V
+physical_cores=8
+logical_cores=8
+core_mix=4 performance cores and 4 low-power efficiency cores
+compiler=g++ 16.2.0 (MinGW-W64 UCRT), release preset
