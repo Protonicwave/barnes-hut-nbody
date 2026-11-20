@@ -1,0 +1,92 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": { "CMAKE_CXX_COMPILER": "g++" }
+    },
+    {
+      "name": "dev",
+      "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "CMAKE_CXX_FLAGS": "-O1" }
+    },
+    {
+      "name": "coverage",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS": "-O0 --coverage -DNDEBUG",
+        "CMAKE_EXE_LINKER_FLAGS": "--coverage"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "asan",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS": "-g -O1 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer"
+      }
+    },
+    {
+      "name": "msvc",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": { "CMAKE_CXX_COMPILER": "cl", "CMAKE_BUILD_TYPE": "Release" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "dev", "configurePreset": "dev" },
+    { "name": "coverage", "configurePreset": "coverage" },
+    { "name": "release", "configurePreset": "release" },
+    { "name": "asan", "configurePreset": "asan" },
+    { "name": "msvc", "configurePreset": "msvc" }
+  ],
+  "testPresets": [
+    {
+      "name": "dev", "configurePreset": "dev",
+      "output": { "outputOnFailure": true, "quiet": true },
+      "execution": { "noTestsAction": "error" }
+    },
+    {
+      "name": "coverage", "configurePreset": "coverage",
+      "output": { "outputOnFailure": true, "quiet": true },
+      "execution": { "noTestsAction": "error" }
+    },
+    {
+      "name": "release", "configurePreset": "release",
+      "output": { "outputOnFailure": true, "quiet": true },
+      "execution": { "noTestsAction": "error" }
+    },
+    {
+      "name": "asan", "configurePreset": "asan",
+      "output": { "outputOnFailure": true, "quiet": true },
+      "execution": { "noTestsAction": "error" }
+    },
+    {
+      "name": "msvc", "configurePreset": "msvc", "configuration": "Release",
+      "output": { "outputOnFailure": true, "quiet": true },
+      "execution": { "noTestsAction": "error" }
+    }
+  ],
+  "workflowPresets": [
+    { "name": "dev", "steps": [
+      { "type": "configure", "name": "dev" }, { "type": "build", "name": "dev" }, { "type": "test", "name": "dev" } ] },
+    { "name": "coverage", "steps": [
+      { "type": "configure", "name": "coverage" }, { "type": "build", "name": "coverage" }, { "type": "test", "name": "coverage" } ] },
+    { "name": "release", "steps": [
+      { "type": "configure", "name": "release" }, { "type": "build", "name": "release" }, { "type": "test", "name": "release" } ] },
+    { "name": "asan", "steps": [
+      { "type": "configure", "name": "asan" }, { "type": "build", "name": "asan" }, { "type": "test", "name": "asan" } ] },
+    { "name": "msvc", "steps": [
+      { "type": "configure", "name": "msvc" }, { "type": "build", "name": "msvc" }, { "type": "test", "name": "msvc" } ] }
+  ]
+}
