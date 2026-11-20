@@ -21,6 +21,7 @@ public:
     void step(std::size_t count);
 
     const ParticleSet& particles() const { return particles_; }
+    const ForceConfig& config() const { return config_; }
     double time() const { return static_cast<double>(steps_taken_) * timestep_; }
 
 private:

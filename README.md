@@ -3,7 +3,8 @@
 A gravitational N-body simulator in C++20. Forces come from direct
 summation or a Barnes-Hut octree, both with Plummer softening, and time
 stepping uses kick-drift-kick leapfrog with a fixed timestep. Force loops run
-on OpenMP threads. Python bindings and a WebAssembly build are planned.
+on OpenMP threads. A Python module wraps the library, and a WebAssembly build
+is planned.
 
 Units are N-body units with G = 1. The library provides:
 
@@ -16,6 +17,39 @@ Units are N-body units with G = 1. The library provides:
 - `Simulation`: leapfrog stepping of a `ParticleSet`.
 - `kinetic_energy`, `potential_energy`, `total_momentum`, `centre_of_mass`.
 - `plummer_sphere`, `uniform_sphere` and `kepler_binary` initial conditions.
+
+## Python
+
+    pip install .
+
+installs `barnes_hut` (Python 3.10 or later, NumPy 1.26 or later) and builds
+the C++ core with CMake, Ninja and a C++20 compiler with OpenMP. Wheels for
+Linux, Windows and macOS on Apple silicon are built by the `wheels` workflow.
+
+```python
+import numpy as np
+import barnes_hut as bh
+
+positions, velocities, masses = bh.plummer_sphere(4096, seed=1)
+simulation = bh.Simulation(
+    positions, velocities, masses,
+    dt=1 / 128, softening=4 / np.sqrt(4096),
+    method="tree", theta=0.5, threads=8,
+)
+start = simulation.total_energy()
+simulation.step(256)
+print(simulation.time, abs(simulation.total_energy() - start) / abs(start))
+```
+
+`method` is `"tree"` or `"direct"`; `theta` is from 0 to 1 and `threads` from 1
+to 256. Invalid settings raise `ValueError` naming the value, and a particle
+leaving the finite range raises `RuntimeError`. `positions`, `velocities` and
+`masses` are read-only NumPy views of the simulation state, with no copy: they
+follow `step`, and keep the simulation alive. The constructor copies its
+inputs. `plummer_sphere`, `uniform_sphere` and `kepler_binary` return the
+three arrays the constructor takes. `step` holds the Python interpreter lock
+for the whole call, and a `Simulation` must not be used from two threads at
+once. The tests run with `python -m pytest`, after `pip install ".[test,plot]"`.
 
 ## Build and test
 
@@ -64,10 +98,24 @@ is over. It reads the core count from `results/machine.txt`. Its tests run
 with `python -m unittest discover -s bench`. The drift sweep takes about
 eight minutes.
 
+The figures below come from those files:
+
+![Force evaluation time against N](results/speed.png)
+![Tree speedup over one thread](results/scaling.png)
+![Force error against the opening angle](results/force_error.png)
+![Energy error over time](results/energy_drift.png)
+
+The tree's energy error does not depend on the timestep: it is set by the
+opening angle, while direct summation's falls with the square of dt. Draw them
+again with `python scripts/plot_results.py`, which needs the `plot` extra.
+
 ## Checks
 
     clang-tidy -quiet -p build/dev --extra-arg=--target=x86_64-w64-mingw32 src/*.cpp
     cppcheck -q --std=c++20 --enable=warning,style,performance,portability,unusedFunction --suppress=useStlAlgorithm --error-exitcode=1 -I include src tests bench
+    ruff check python scripts
+    mypy
+    vulture python scripts --min-confidence 60
     cmake --workflow --preset coverage
     gcovr --root . --filter src/direct.cpp --filter src/octree.cpp --filter src/forces.cpp --filter src/simulation.cpp --filter src/diagnostics.cpp --exclude-throw-branches --exclude-unreachable-branches --exclude-noncode-lines --fail-under-line 100 --fail-under-branch 100 build/coverage
 

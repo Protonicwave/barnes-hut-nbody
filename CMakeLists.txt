@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(NBODY_BUILD_BENCH "Build the benchmark and accuracy programs" OFF)
+option(NBODY_BUILD_PYTHON "Build the Python extension module" OFF)
 
 include(CTest)
 
@@ -31,7 +32,12 @@ add_library(nbody_core
   src/setups.cpp)
 target_include_directories(nbody_core PUBLIC include)
 target_compile_features(nbody_core PUBLIC cxx_std_20)
+set_target_properties(nbody_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(nbody_core PRIVATE nbody_warnings OpenMP::OpenMP_CXX)
+
+if(NBODY_BUILD_PYTHON)
+  add_subdirectory(python)
+endif()
 
 if(BUILD_TESTING)
   add_subdirectory(tests)

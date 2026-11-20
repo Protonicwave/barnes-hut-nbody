@@ -19,6 +19,15 @@ jobs:
       - run: cmake --workflow --preset release
       - run: python3 -m unittest discover -s bench -p "test_*.py"
 
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: python3 -m venv .venv
+      - run: .venv/bin/python -m pip install ".[test,plot]"
+      - run: .venv/bin/python -m pytest -q
+
   sanitisers:
     runs-on: ubuntu-latest
     timeout-minutes: 30

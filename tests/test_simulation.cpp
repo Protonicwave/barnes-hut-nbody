@@ -134,3 +134,15 @@ TEST_CASE("particles meeting with zero softening throw naming particle and step"
     REQUIRE_THROWS_OF(simulation.step(1), std::runtime_error,
                       "velocity of particle 0 became non-finite at step 1");
 }
+
+TEST_CASE("simulation reports the force configuration it was built with") {
+    const ForceConfig config{.softening = 0.125,
+                             .method = nbody::ForceMethod::tree,
+                             .theta = 0.7,
+                             .thread_count = 3};
+    const Simulation simulation(nbody::kepler_binary(0.5, 1.0), config, 0.01);
+    CHECK(simulation.config().softening == 0.125);
+    CHECK(simulation.config().method == nbody::ForceMethod::tree);
+    CHECK(simulation.config().theta == 0.7);
+    CHECK(simulation.config().thread_count == 3);
+}
