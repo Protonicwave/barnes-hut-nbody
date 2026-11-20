@@ -76,6 +76,66 @@ describe("both builds", () => {
     });
   }
 
+  for (const [name, module] of [["single", single], ["threaded", threaded]]) {
+    it(`${name}: changes method and theta on a running simulation and keeps the time`, () => {
+      const simulation = plummer(module, 1, "direct");
+      simulation.step(4);
+      simulation.setForceSettings("tree", 0.7, 1);
+      assert.ok(Math.abs(simulation.time() - 4 * DT) < 1e-12);
+      simulation.step(4);
+      assert.ok(Math.abs(simulation.time() - 8 * DT) < 1e-12);
+      assert.throws(() => simulation.setForceSettings("fmm", 0.5, 1), /method.*"fmm"/);
+      assert.throws(() => simulation.setForceSettings("tree", 1.5, 1), /1\.5/);
+      assert.throws(() => simulation.setForceSettings("tree", 0.5, 0), /threads.*got 0/);
+      simulation.delete();
+    });
+
+    it(`${name}: compares the named method with direct summation`, () => {
+      const exact = module.Simulation.create("plummer", 512, 1, "tree", 0, 0.1, DT, 1);
+      const { medianError, p99Error, meanInteractions } = exact.compare("tree");
+      assert.ok(medianError < 1e-12 && p99Error < 1e-12);
+      assert.equal(meanInteractions, 511);
+      exact.delete();
+
+      const approximate = plummer(module);
+      const result = approximate.compare("tree");
+      assert.ok(result.medianError > 0 && result.medianError < 5e-3);
+      assert.ok(result.p99Error >= result.medianError);
+      assert.ok(result.meanInteractions < COUNT - 1);
+      assert.equal(approximate.compare("direct").medianError, 0);
+      assert.throws(() => approximate.compare("fmm"), /method.*"fmm"/);
+      approximate.delete();
+    });
+
+    it(`${name}: reports octree cells and the walk for one particle`, () => {
+      const simulation = plummer(module);
+      const cells = simulation.treeCells(4);
+      assert.ok(cells.length > 0 && cells.length % 5 === 0);
+      const depths = new Set();
+      for (let c = 4; c < cells.length; c += 5) depths.add(cells[c]);
+      assert.deepEqual([...depths].sort(), [2, 3, 4]);
+      assert.throws(() => simulation.treeCells(1), /depth.*got 1/);
+      assert.throws(() => simulation.treeCells(6), /depth.*got 6/);
+
+      const trace = simulation.walkTrace(3);
+      const counted = trace.accepted.length / 5 + trace.particles.length;
+      assert.ok(counted > 0 && counted < COUNT - 1);
+      assert.ok(trace.opened.length > 0);
+      assert.ok(!trace.particles.includes(3));
+      assert.throws(() => simulation.walkTrace(COUNT), new RegExp(`index.*got ${COUNT}`));
+      assert.throws(() => simulation.walkTrace(-1), /index.*got -1/);
+      simulation.delete();
+    });
+
+    it(`${name}: evaluates forces by either method for timing`, () => {
+      const simulation = plummer(module);
+      simulation.evaluateForces("direct");
+      simulation.evaluateForces("tree");
+      assert.throws(() => simulation.evaluateForces("fmm"), /method.*"fmm"/);
+      simulation.delete();
+    });
+  }
+
   it("reports the thread limit of each build", () => {
     assert.equal(single.MAX_THREADS, 1);
     assert.equal(threaded.MAX_THREADS, 8);
