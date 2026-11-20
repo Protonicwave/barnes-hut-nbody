@@ -61,7 +61,7 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "NBODY_BUILD_BENCH": "ON" }
     },
     { "name": "wasm-threads", "inherits": "wasm", "cacheVariables": { "NBODY_WASM_THREADS": "ON" } },
     { "name": "wasm-single", "inherits": "wasm", "cacheVariables": { "NBODY_WASM_THREADS": "OFF" } }
