@@ -4,6 +4,18 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
 
+import { Runner } from "../runner.js";
+import {
+  DEFAULT_SETTINGS,
+  PARTICLE_COUNTS,
+  SOFTENING_SCALES,
+  TIMESTEP_LABELS,
+  controlState,
+  labels,
+  moduleState,
+  particleCount,
+  withChange,
+} from "../settings.js";
 import createThreaded from "../wasm/threads/nbody.js";
 import createSingle from "../wasm/single/nbody.js";
 
@@ -155,4 +167,216 @@ describe("threaded against single-threaded", () => {
       eight.delete();
     });
   }
+});
+
+// A module that records the calls the page's controls make on its Simulation.
+function recording(module) {
+  const calls = [];
+  const create = (...args) => {
+    calls.push(["create", ...args]);
+    const simulation = module.Simulation.create(...args);
+    return new Proxy(simulation, {
+      get(target, name) {
+        const member = target[name];
+        return typeof member === "function"
+          ? (...call) => { calls.push([name, ...call]); return member.apply(target, call); }
+          : member;
+      },
+    });
+  };
+  return { calls, MAX_THREADS: module.MAX_THREADS, Simulation: { create } };
+}
+
+const SMALL = { ...DEFAULT_SETTINGS, countIndex: 0, threads: 1 };
+const lastCall = (calls, name) => calls.findLast((call) => call[0] === name);
+const frame = (runner, request = {}) =>
+  runner.frame({ steps: 1, budgetMs: 1000, probe: -1, wantCells: false, ...request }).message;
+
+describe("page controls reach the simulation with the value their label shows", () => {
+  it("theta keeps the particles and the time, rounded to its grid", () => {
+    const module = recording(single);
+    const runner = new Runner(module, SMALL);
+    frame(runner, { steps: 4 });
+    const next = withChange(SMALL, "theta", 0.30000000000000004);
+    assert.equal(runner.change(next), "tune");
+    assert.equal(labels(next).theta, "0.3");
+    assert.deepEqual(lastCall(module.calls, "setForceSettings"), ["setForceSettings", "tree", 0.3, 1]);
+    assert.equal(module.calls.filter((call) => call[0] === "create").length, 1);
+    assert.ok(Math.abs(frame(runner, { steps: 0 }).time - 4 / 128) < 1e-12);
+    runner.close();
+  });
+
+  it("method keeps the particles and starts a new energy series", () => {
+    const module = recording(single);
+    const runner = new Runner(module, SMALL);
+    const before = frame(runner, { steps: 16 });
+    assert.equal(before.samples.length, 1);
+    const next = withChange(SMALL, "method", "direct");
+    assert.equal(runner.change(next), "method");
+    assert.deepEqual(lastCall(module.calls, "setForceSettings"), ["setForceSettings", "direct", 0.5, 1]);
+    assert.equal(labels(next).theta, "off");
+    assert.equal(controlState(next).thetaDisabled, true);
+    const after = frame(runner, { steps: 0 });
+    assert.notEqual(after.seriesId, before.seriesId);
+    assert.equal(after.samples.length, 0);
+    runner.close();
+  });
+
+  it("softening is k over the square root of N for each choice", () => {
+    for (const scale of SOFTENING_SCALES) {
+      const module = recording(single);
+      const runner = new Runner(module, SMALL);
+      const next = withChange(SMALL, "softeningScale", scale);
+      runner.change(next);
+      const [, , count, , , , softening] = lastCall(module.calls, "create");
+      assert.equal(softening, scale / Math.sqrt(count));
+      assert.equal(labels(next).softening, softening.toFixed(3));
+      runner.close();
+    }
+  });
+
+  it("particle count is the number the label shows", () => {
+    for (let countIndex = 1; countIndex < 4; countIndex++) {
+      const module = recording(single);
+      const runner = new Runner(module, SMALL);
+      const next = withChange(SMALL, "countIndex", countIndex);
+      assert.equal(runner.change(next), "restart");
+      const [, , count] = lastCall(module.calls, "create");
+      assert.equal(count, Number(labels(next).count.replaceAll(",", "")));
+      assert.equal(frame(runner).count, particleCount(next));
+      runner.close();
+    }
+    assert.equal(PARTICLE_COUNTS.length, 6);
+  });
+
+  it("timestep is the fraction the label shows", () => {
+    TIMESTEP_LABELS.forEach((label, timestepIndex) => {
+      const module = recording(single);
+      const runner = new Runner(module, SMALL);
+      runner.change(withChange(SMALL, "timestepIndex", timestepIndex));
+      const [numerator, denominator] = label.split("/").map(Number);
+      const expected = timestepIndex === SMALL.timestepIndex ? undefined : numerator / denominator;
+      if (expected !== undefined) {
+        assert.equal(lastCall(module.calls, "create")[7], expected);
+      }
+      runner.close();
+    });
+  });
+
+  it("a new seed restarts with the seed the label shows", () => {
+    const module = recording(single);
+    const runner = new Runner(module, SMALL);
+    const next = withChange(SMALL, "seed", 2);
+    assert.equal(runner.change(next), "restart");
+    assert.equal(lastCall(module.calls, "create")[3], 2);
+    assert.equal(labels(next).seed, "seed 2");
+    runner.close();
+  });
+
+  it("the Kepler setup builds two bodies and disables N and softening", () => {
+    const module = recording(single);
+    const runner = new Runner(module, SMALL);
+    const next = withChange(SMALL, "setup", "kepler");
+    runner.change(next);
+    const create = lastCall(module.calls, "create");
+    assert.equal(create[1], "kepler");
+    assert.equal(create[6], 0);
+    assert.equal(labels(next).softening, "0");
+    assert.equal(labels(next).count, "2");
+    assert.deepEqual(
+      [controlState(next).countDisabled, controlState(next).softeningDisabled, controlState(next).cellsHidden],
+      [true, true, true]);
+    assert.equal(controlState(SMALL).countDisabled, false);
+    const message = frame(runner, { steps: 2, wantCells: true, probe: 0 });
+    assert.equal(message.count, 2);
+    assert.equal(message.cells, null);
+    assert.equal(message.probe, null);
+    runner.close();
+  });
+
+  it("warns above theta 0.7 only while the tree is in use", () => {
+    assert.equal(controlState(withChange(SMALL, "theta", 0.8)).thetaWarning, true);
+    assert.equal(controlState(withChange(SMALL, "theta", 0.7)).thetaWarning, false);
+    const direct = withChange(withChange(SMALL, "theta", 0.9), "method", "direct");
+    assert.equal(controlState(direct).thetaWarning, false);
+  });
+});
+
+describe("page states", () => {
+  it("a failed module load shows the failed state with a Reload button and locked controls", () => {
+    const state = moduleState("failed", "single", 1);
+    assert.deepEqual(
+      [state.showFailed, state.showReload, state.showLoading, state.controlsDisabled],
+      [true, true, false, true]);
+  });
+
+  it("loading locks the controls and the single-threaded build explains itself", () => {
+    assert.deepEqual(
+      [moduleState("loading").showLoading, moduleState("loading").controlsDisabled],
+      [true, true]);
+    const oneThread = moduleState("ready", "single", 1);
+    assert.deepEqual(
+      [oneThread.showBanner, oneThread.threadsDisabled, oneThread.controlsDisabled],
+      [true, true, false]);
+    assert.equal(oneThread.badge, "WebAssembly, one thread");
+    const threaded = moduleState("ready", "threads", 8);
+    assert.deepEqual([threaded.showBanner, threaded.threadsDisabled], [false, false]);
+    assert.equal(threaded.badge, "WebAssembly, 8 threads");
+  });
+});
+
+describe("frames", () => {
+  it("carry positions, speed bands, energy samples and the measurement on the twelfth stepped frame", () => {
+    const runner = new Runner(single, SMALL);
+    let samples = 0;
+    for (let k = 1; k <= 12; k++) {
+      const message = frame(runner, { steps: 2 });
+      samples += message.samples.length;
+      assert.equal(message.positions.length, 2 * 256);
+      assert.equal(message.bands.length, 256);
+      assert.ok(message.bands.every((band) => band >= 0 && band < 14));
+      assert.equal(message.measurement === null, k !== 12, `frame ${k}`);
+    }
+    assert.equal(samples, 1);
+    const paused = frame(runner, { steps: 0 });
+    assert.equal(paused.measurement, null);
+    assert.ok(Math.abs(paused.time - 24 / 128) < 1e-12);
+    runner.close();
+  });
+
+  it("measure a tree faster than direct with a small error and fewer interactions", () => {
+    const larger = { ...SMALL, countIndex: 3 };
+    const runner = new Runner(single, larger);
+    runner.change({ ...larger, theta: 0.6 });
+    const measured = frame(runner, { steps: 0 }).measurement;
+    assert.equal(measured.count, 2048);
+    assert.ok(measured.directMs > 0 && measured.treeMs > 0);
+    assert.ok(measured.medianError > 0 && measured.medianError < 5e-3);
+    assert.ok(measured.p99Error >= measured.medianError);
+    assert.ok(measured.meanInteractions < 2047);
+    assert.equal(frame(runner, { steps: 0 }).measurement, null);
+    runner.close();
+  });
+
+  it("send octree cells when wanted and a walk for a probed particle", () => {
+    const runner = new Runner(single, SMALL);
+    assert.equal(frame(runner, { steps: 1 }).cells, null);
+    const first = frame(runner, { steps: 1, wantCells: true, probe: 3 });
+    assert.ok(first.cells.length > 0 && first.cells.length % 5 === 0);
+    assert.ok(first.probe.interactions > 0 && first.probe.interactions < 255);
+    assert.ok(first.probe.opened.length > 0 && first.probe.accepted.length > 0);
+    assert.equal(frame(runner, { steps: 1, wantCells: true }).cells, null);
+    assert.ok(frame(runner, { steps: 4, wantCells: true }).cells.length > 0);
+    assert.equal(frame(runner, { probe: 999 }).probe, null);
+    runner.close();
+  });
+
+  it("stop stepping once the time budget is spent", () => {
+    let clock = 0;
+    const runner = new Runner(single, SMALL, () => (clock += 5));
+    const message = runner.frame({ steps: 16, budgetMs: 12, probe: -1, wantCells: false }).message;
+    assert.ok(message.time < 16 / 128);
+    assert.ok(message.time > 0);
+    runner.close();
+  });
 });

@@ -1,35 +1,51 @@
 // Runs the simulation off the main thread: the threaded build joins its
 // workers with a blocking wait, which a page's main thread may not do.
+//
+// Out: "loaded" with the build and its thread limit once the module is
+// ready, "ready" once a simulation exists, one "frame" per request, and
+// "failed" with a message for any error.
+// In: { type: "start", settings } after "loaded", then
+//   { type: "settings", settings, generation } and { type: "frame", steps, probe, wantCells }.
 
-const PARTICLE_COUNT = 8192;
-const SEED = 1;
-const THETA = 0.5;
-const TIMESTEP = 1 / 128;
-const STEPS = 16;
+import { Runner } from "./runner.js";
+
+// Longest a frame spends stepping, so the page keeps its frame rate.
+const FRAME_BUDGET_MS = 12;
 
 // Threaded builds need cross-origin isolation for shared memory.
 const variant = self.crossOriginIsolated ? "threads" : "single";
 
-async function run() {
-  const { default: createModule } = await import(`./wasm/${variant}/nbody.js`);
-  const module = await createModule();
-  const threads = Math.min(module.MAX_THREADS, navigator.hardwareConcurrency || 1);
-  postMessage({ type: "ready", variant, threads, count: PARTICLE_COUNT });
+let module = null;
+let runner = null;
+// The page's count of settings changes, echoed on frames so it can drop a
+// frame that was computed before the latest change.
+let generation = 0;
 
-  const softening = 4 / Math.sqrt(PARTICLE_COUNT);
-  const simulation = module.Simulation.create(
-    "plummer", PARTICLE_COUNT, SEED, "tree", THETA, softening, TIMESTEP, threads);
-  try {
-    const start = performance.now();
-    simulation.step(STEPS);
-    const elapsedMs = performance.now() - start;
-    const initial = simulation.initialEnergy();
-    const drift = Math.abs(simulation.energy() - initial) / Math.abs(initial);
-    postMessage({ type: "done", steps: STEPS, stepMs: elapsedMs / STEPS, drift });
-  } finally {
-    simulation.delete();
-    module.PThread?.terminateAllThreads();
-  }
+function fail(error) {
+  postMessage({ type: "failed", message: String(error?.message ?? error) });
 }
 
-run().catch((error) => postMessage({ type: "failed", message: String(error?.message ?? error) }));
+async function load() {
+  const { default: createModule } = await import(`./wasm/${variant}/nbody.js`);
+  module = await createModule();
+  postMessage({ type: "loaded", variant, maxThreads: module.MAX_THREADS });
+}
+
+onmessage = ({ data }) => {
+  try {
+    if (data.type === "start") {
+      runner = new Runner(module, data.settings);
+      postMessage({ type: "ready" });
+    } else if (data.type === "settings") {
+      generation = data.generation;
+      runner.change(data.settings);
+    } else if (data.type === "frame") {
+      const { message, transfer } = runner.frame({ ...data, budgetMs: FRAME_BUDGET_MS });
+      postMessage({ ...message, generation }, transfer);
+    }
+  } catch (error) {
+    fail(error);
+  }
+};
+
+load().catch(fail);

@@ -86,12 +86,22 @@ const error = Math.abs(simulation.energy() - simulation.initialEnergy())
 0.5, semi-major axis 1, which ignore the count and seed). `step` takes 1 to
 1024 steps. `energy` is the kinetic energy plus the direct softened potential,
 whatever the force method. Invalid arguments throw an `Error` naming the
-value. The views point into the heap, so read them before the next call. The
+value. Also on `Simulation`: `setForceSettings(method, theta, threads)`,
+`evaluateForces(method)`, `compare(method)` (median and 99th-percentile force
+error against direct summation, and mean interactions per particle),
+`treeCells(maxDepth)` and `walkTrace(index)`. The views point into the heap, so read them before the next call. The
 threaded build needs a worker: it joins its threads with a blocking wait,
 which a page's main thread may not do, so `web/worker.js` runs the module.
 
-`web/index.html` is a harness page that runs 8192 particles in that worker and
-reports the build, the thread count and the time per step. Threads need
+`web/index.html` is the simulator page. It runs the module in the worker
+`web/worker.js` and draws the particles, the octree cells and one particle's
+tree walk, with live timings of direct and tree evaluation, the relative energy
+error, and the results figures below. `web/data/results.json` holds the figures
+it draws, written from `results/` by `python scripts/export_page_data.py`. The
+fonts in `web/fonts/` are Source Serif 4, Source Sans 3 and Source Code Pro
+under the SIL Open Font Licence. Screenshots are in `docs/screenshots/`.
+
+Threads need
 shared memory, and browsers allow that only on a cross-origin isolated page,
 which means two response headers:
 
@@ -101,9 +111,10 @@ which means two response headers:
 GitHub Pages cannot send them. `web/_headers` sets them on Cloudflare Pages.
 `python web/serve.py` serves the directory locally with them, and
 `--no-isolation` leaves them out, which shows the page fall back to the
-single-threaded build with a banner saying so. In Chrome on the development
-machine, with the headers the page is isolated and steps 8192 particles at
-13.3 ms per step on 8 threads. Without them it takes 63.8 ms on one.
+single-threaded build with a banner saying so. In headless Chrome on the
+development machine the page loads in 256 ms to its largest paint on the
+single-threaded build, with no layout shift, and its own JavaScript is 15 KiB
+compressed. Lighthouse was not run.
 
 ## Build and test
 

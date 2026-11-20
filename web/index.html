@@ -3,36 +3,336 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Barnes-Hut N-body harness</title>
-<style>
-  :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
-  body { margin: 0 auto; max-width: 40rem; padding: 1.5rem 1rem; line-height: 1.5; }
-  h1 { font-size: 1.25rem; }
-  dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
-  dt { font-weight: 600; }
-  dd { margin: 0; font-variant-numeric: tabular-nums; }
-  #banner { padding: 0.5rem 0.75rem; border: 1px solid; border-radius: 4px; }
-  [hidden] { display: none; }
-</style>
+<title>Barnes-Hut N-body</title>
+<meta name="description" content="A gravitational N-body simulator in C++20 with a Barnes-Hut octree, running in the browser as WebAssembly.">
+<link rel="preload" href="fonts/source-serif-4.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/source-sans-3.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="page.js"></script>
 </head>
 <body>
-<h1>Barnes-Hut N-body harness</h1>
-<p id="banner" hidden>
-  Running on one thread. The page is not cross-origin isolated: send
-  <code>Cross-Origin-Opener-Policy: same-origin</code> and
-  <code>Cross-Origin-Embedder-Policy: require-corp</code> to use threads.
-</p>
-<dl id="result">
-  <dt>Cross-origin isolated</dt><dd id="isolated">checking</dd>
-  <dt>Build</dt><dd id="build">loading</dd>
-  <dt>Setup</dt><dd id="setup">Plummer sphere, tree, theta 0.5</dd>
-  <dt>Particles</dt><dd id="count"></dd>
-  <dt>Threads</dt><dd id="threads"></dd>
-  <dt>Steps taken</dt><dd id="steps"></dd>
-  <dt>Time per step</dt><dd id="step-time"></dd>
-  <dt>Relative energy error</dt><dd id="drift"></dd>
-  <dt>State</dt><dd id="state">running</dd>
-</dl>
-<script type="module" src="harness.js"></script>
+
+<header class="site-head">
+  <div class="wrap">
+    <a class="wordmark" href="#top">barnes-hut-nbody</a>
+    <nav aria-label="Sections">
+      <a href="#simulator" aria-current="true">Simulator</a>
+      <a href="#results">Results</a>
+      <a href="#method">Method</a>
+      <a href="#use">Use it</a>
+    </nav>
+    <a class="head-source" href="https://github.com/Protonicwave/barnes-hut-nbody">Source on GitHub</a>
+  </div>
+</header>
+
+<main id="top">
+<div class="wrap">
+
+  <div class="intro">
+    <h1>Barnes-Hut N-body</h1>
+    <p>A gravitational N-body simulator in C++20. A tree of cells stands in for distant groups of particles, so the force on each one costs about <span class="math">N&thinsp;log&thinsp;N</span> operations instead of <span class="math">N<sup class="u">2</sup></span>. The simulation below is that C++ code, compiled to WebAssembly, running in this tab.</p>
+  </div>
+
+  <section id="simulator" aria-label="Simulator" class="sim">
+
+    <div class="viewport" id="viewport">
+      <canvas id="view" aria-label="Particles projected along the z axis. Hover or tap a particle to see which tree cells its force is summed from."></canvas>
+      <div class="hud hud-tl"><span class="live-dot" id="liveDot" data-live="off"></span><span id="modeBadge">Loading</span></div>
+      <div class="hud hud-tr"><button class="toggle" id="cellsToggle" type="button" aria-pressed="true">Tree cells</button></div>
+      <div class="hud hud-bl"><span class="scale-bar" id="scaleBar"></span><span>1 length unit</span></div>
+      <div class="hud hud-br" id="probeHud" aria-live="off"><span class="dim">Hover or tap a particle to see its tree walk.</span></div>
+      <div class="overlay-state" id="stateLoading" data-show="true" role="status">
+        <h2>Loading the simulation</h2>
+        <div class="loadline"></div>
+        <p>Fetching the WebAssembly module. The controls unlock when it is ready.</p>
+      </div>
+      <div class="overlay-state" id="stateFailed" data-show="false" role="alert">
+        <h2>The simulation module did not load</h2>
+        <p>Either the browser blocked WebAssembly or the file did not arrive. Reload the page to try again. The Python package runs the same code if this keeps happening.</p>
+        <p class="detail" id="failedDetail"></p>
+        <button class="btn" type="button" id="reloadBtn">Reload</button>
+      </div>
+    </div>
+
+    <div class="transport">
+      <div class="transport-main">
+        <button class="btn btn-primary" id="playBtn" type="button">Pause</button>
+        <button class="btn" id="resetBtn" type="button">Reset</button>
+        <button class="btn" id="seedBtn" type="button">New seed</button>
+      </div>
+      <div class="field" style="min-width: 12.5rem">
+        <div class="seg" role="radiogroup" aria-label="Steps per frame">
+          <label><input type="radio" name="speed" value="1"><span>1×</span></label>
+          <label><input type="radio" name="speed" value="4" checked><span>4×</span></label>
+          <label><input type="radio" name="speed" value="16"><span>16×</span></label>
+        </div>
+      </div>
+      <div class="readout-time"><span>t</span><b class="num" id="timeVal">0.00</b><span class="fine" id="seedNote">seed 1</span></div>
+    </div>
+
+    <aside class="rail" aria-label="Controls and measurements">
+      <div class="banner" id="fallbackBanner" data-show="false" style="border-left-color: var(--tree)">
+        <strong>Running on one thread.</strong>
+        <span>This page is not cross-origin isolated, so the browser withholds WebAssembly threads. The result is the same, only slower. <a href="#use">See the two headers it needs.</a></span>
+      </div>
+
+      <fieldset class="controls" id="controls" disabled>
+        <legend class="visually-hidden">Simulation controls</legend>
+
+        <div class="group">
+          <h3>Setup</h3>
+          <div class="field">
+            <label for="setup">Initial conditions</label>
+            <select id="setup">
+              <option value="plummer">Plummer sphere</option>
+              <option value="collapse">Cold collapse</option>
+              <option value="kepler">Kepler binary</option>
+            </select>
+            <div class="hint" id="setupHint"></div>
+          </div>
+          <div class="field">
+            <div class="field-row"><label for="nIdx">Particles</label><output id="nOut" for="nIdx"></output></div>
+            <div class="range"><input type="range" id="nIdx" min="0" max="5" step="1" value="2"></div>
+            <div class="hint" id="nHint"></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <h3>Force</h3>
+          <div class="field">
+            <span class="label" id="methodLabel">Method</span>
+            <div class="seg" role="radiogroup" aria-labelledby="methodLabel">
+              <label><input type="radio" name="method" value="direct"><span>Direct</span></label>
+              <label><input type="radio" name="method" value="tree" checked><span>Tree</span></label>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-row"><label for="theta">Opening angle <span class="math">θ</span></label><output id="thetaOut" for="theta"></output></div>
+            <div class="range"><span class="zone" aria-hidden="true"></span><input type="range" id="theta" min="0.2" max="1" step="0.1" value="0.5"></div>
+            <div class="hint" id="thetaHint"></div>
+          </div>
+          <div class="field">
+            <div class="field-row"><span class="label" id="epsLabel">Softening <span class="math">ε</span></span><output id="epsOut"></output></div>
+            <div class="seg" role="radiogroup" aria-labelledby="epsLabel">
+              <label><input type="radio" name="eps" value="1"><span>1/√N</span></label>
+              <label><input type="radio" name="eps" value="2"><span>2/√N</span></label>
+              <label><input type="radio" name="eps" value="4" checked><span>4/√N</span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="group">
+          <h3>Integrator</h3>
+          <div class="field">
+            <span class="label" id="dtLabel">Timestep <span class="math">Δt</span>, leapfrog</span>
+            <div class="seg" role="radiogroup" aria-labelledby="dtLabel">
+              <label><input type="radio" name="dt" value="0"><span>1/256</span></label>
+              <label><input type="radio" name="dt" value="1" checked><span>1/128</span></label>
+              <label><input type="radio" name="dt" value="2"><span>1/64</span></label>
+            </div>
+          </div>
+          <div class="field">
+            <span class="label" id="thrLabel">Threads</span>
+            <div class="seg" role="radiogroup" aria-labelledby="thrLabel" id="thrSeg">
+              <label><input type="radio" name="thr" value="1"><span>1</span></label>
+              <label><input type="radio" name="thr" value="2"><span>2</span></label>
+              <label><input type="radio" name="thr" value="4"><span>4</span></label>
+              <label><input type="radio" name="thr" value="8" checked><span>8</span></label>
+            </div>
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="group measure" aria-label="Live measurements">
+        <h3>Measured in this tab</h3>
+        <div>
+          <div class="bars" id="timeBars">
+            <div class="bar-row" data-kind="direct"><span>Direct</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="v num" id="tDirect">…</span></div>
+            <div class="bar-row" data-kind="tree"><span>Tree</span><span class="track"><span class="fill" style="width:20%"></span></span><span class="v num" id="tTree">…</span></div>
+          </div>
+          <div class="big" style="margin-top: 12px"><b class="num" id="speedup">…</b><span>faster than direct, per force evaluation</span></div>
+        </div>
+        <dl class="pairs">
+          <dt>Force error, median</dt><dd id="errMed">…</dd>
+          <dt>Force error, 99th percentile</dt><dd id="errP99">…</dd>
+          <dt>Interactions per particle</dt><dd id="inter">…</dd>
+          <dt>Direct would use</dt><dd id="interDirect">…</dd>
+        </dl>
+        <p class="fine">Timed on the current positions every few seconds, with the tree at the θ above. Error is against direct summation at the same ε.</p>
+      </div>
+    </aside>
+
+    <div class="strip" id="strip">
+      <div class="strip-head">
+        <h3>Relative energy error over time</h3>
+        <span class="val num">now <b id="eNow">0</b></span>
+      </div>
+      <svg id="energySvg" class="chart" role="img" aria-label="Relative total-energy error against time, on a logarithmic scale"></svg>
+    </div>
+  </section>
+</div>
+
+<section id="results" class="band" aria-labelledby="results-h">
+  <div class="wrap">
+    <div class="band-head">
+      <h2 id="results-h">What the tree buys, and what it costs</h2>
+      <p>Two questions decide whether the tree is worth using. How much faster is it than summing every pair, and how much accuracy does it give up? Each figure answers one, with direct summation as the reference.</p>
+    </div>
+
+    <div class="result">
+      <div class="result-copy">
+        <h3>Speed</h3>
+        <p>One force evaluation, tree build included, timed over a range of particle counts and thread counts. Direct summation is parallelised the same way, so the comparison is like for like.</p>
+      </div>
+      <div class="plates wide-first">
+        <figure class="plate" style="margin:0">
+          <header><h4>Time per force evaluation</h4></header>
+          <svg class="chart" id="figTime" role="img" aria-label="Time per force evaluation against particle count, direct and tree, both on log axes"></svg>
+          <figcaption id="capTime"></figcaption>
+        </figure>
+        <figure class="plate" style="margin:0">
+          <header><h4>Scaling with threads</h4></header>
+          <svg class="chart" id="figThreads" role="img" aria-label="Speedup of the tree force evaluation against thread count"></svg>
+          <figcaption id="capThreads"></figcaption>
+        </figure>
+        <figure class="plate" style="margin:0">
+          <header><h4>Native and WebAssembly</h4></header>
+          <div class="table-scroll">
+            <table class="budget" style="margin-top:-4px">
+              <thead><tr><th>Build</th><th>One tree evaluation</th><th>Against native</th></tr></thead>
+              <tbody id="wasmRows"></tbody>
+            </table>
+          </div>
+          <figcaption id="capWasm"></figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <div class="result">
+      <div class="result-copy">
+        <h3>Accuracy</h3>
+        <p>The tree changes the answer in two separable ways: it approximates each force, and that error feeds into the integration. The first figure isolates the force. The second runs the same orbit with direct summation at the same timestep and softening, so any gap above it belongs to the tree.</p>
+      </div>
+      <div class="plates">
+        <figure class="plate" style="margin:0">
+          <header><h4>Force error against θ</h4></header>
+          <svg class="chart" id="figForce" role="img" aria-label="Median and 99th percentile relative force error against opening angle, log scale"></svg>
+          <figcaption id="capForce"></figcaption>
+        </figure>
+        <figure class="plate" style="margin:0">
+          <header><h4>Energy drift over ten crossing times</h4></header>
+          <svg class="chart" id="figDrift" role="img" aria-label="Relative energy error against time for direct summation and the tree at four opening angles"></svg>
+          <figcaption id="capDrift"></figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <div class="result">
+      <div class="result-copy">
+        <h3>Budgets</h3>
+        <p>Each limit is a number written down before the measurement, and a script exits non-zero when any is exceeded.</p>
+      </div>
+      <div class="table-scroll">
+        <table class="budget">
+          <thead><tr><th>Budget</th><th>Limit</th><th>Measured</th><th>Status</th></tr></thead>
+          <tbody id="budgetRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="method" class="band" aria-labelledby="method-h">
+  <div class="wrap">
+    <div class="band-head">
+      <h2 id="method-h">How it works</h2>
+      <p>Four choices set the behaviour of the code. Each one is tested, and each states what it gives up.</p>
+    </div>
+    <div class="method">
+      <div class="method-row">
+        <h3>The opening test</h3>
+        <p>A cell stands in for its particles only when it is far enough away. The distance <span class="math">d</span> from the particle to the cell's centre of mass must exceed <span class="math">s/θ + δ</span>, where <span class="math">s</span> is the cell's side and <span class="math">δ</span> is how far its centre of mass sits from its geometric centre. The plain test <span class="math">s/d &lt; θ</span> fails for particles near the edge of a large cell (Salmon and Warren 1994), which the offset term fixes (Barnes 1994). The default is <span class="math">θ</span> = 0.5, and values above about 0.7 are not recommended (Dehnen 2002).</p>
+        <div class="eq"><i>d</i> &gt; <span class="frac"><span><i>s</i></span><span><i>θ</i></span></span> + <i>δ</i><span class="note">Open the cell unless this holds</span></div>
+      </div>
+      <div class="method-row">
+        <h3>The integrator</h3>
+        <p>Kick-drift-kick leapfrog with one fixed timestep for every particle. It is symplectic, so with a fixed step the energy error stays bounded instead of growing steadily. Variable steps would break that guarantee, so they are left out.</p>
+        <div class="eq"><i>v</i> ← <i>v</i> + ½<i>Δt</i> <i>a</i><br><i>x</i> ← <i>x</i> + <i>Δt</i> <i>v</i><br><i>a</i> ← <i>a</i>(<i>x</i>)<br><i>v</i> ← <i>v</i> + ½<i>Δt</i> <i>a</i></div>
+      </div>
+      <div class="method-row">
+        <h3>Softening</h3>
+        <p>Plummer softening adds <span class="math">ε<sup class="u">2</sup></span> to the squared distance, so a close pair cannot produce an unbounded acceleration. The softening length is a physical choice, so the code has no default for it. This page starts at 4/√N and lets you try 1/√N and 2/√N.</p>
+        <div class="eq"><i>a<sub>i</sub></i> = Σ<sub><i>j</i>≠<i>i</i></sub> <span class="frac"><span><i>m<sub>j</sub></i> (<i>x<sub>j</sub></i> − <i>x<sub>i</sub></i>)</span><span>(|<i>x<sub>j</sub></i> − <i>x<sub>i</sub></i>|<sup>2</sup> + <i>ε</i><sup>2</sup>)<sup>3/2</sup></span></span><span class="note">G = 1</span></div>
+      </div>
+      <div class="method-row">
+        <h3>The three setups</h3>
+        <p>A Plummer sphere in virial units is the equilibrium case. A cold collapse starts a uniform sphere at rest and is the stress case, where energy error is hard to judge. A two-body Kepler orbit has an exact answer, so it checks the integrator on its own, with no tree involved.</p>
+        <div class="eq"><i>M</i> = <i>G</i> = −4<i>E</i> = 1<span class="note">Virial units for the Plummer sphere</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="use" class="band" aria-labelledby="use-h">
+  <div class="wrap">
+    <div class="band-head">
+      <h2 id="use-h">Use it</h2>
+      <p>The same core builds as a C++ library, installs as a Python module and runs here in the browser.</p>
+    </div>
+    <div class="use">
+      <div class="use-block">
+        <h3>From Python</h3>
+        <p>The module returns NumPy arrays. Positions are a read-only view onto the simulation's memory, so reading them does not copy.</p>
+        <div class="code">
+          <button class="copy" type="button" data-copy="py">Copy</button>
+<pre id="py"><span class="c"># from a clone of the repository: pip install .</span>
+import numpy as np
+import barnes_hut as bh
+
+positions, velocities, masses = bh.plummer_sphere(4096, seed=1)
+simulation = bh.Simulation(
+    positions, velocities, masses,
+    dt=1 / 128, softening=4 / np.sqrt(4096),
+    method="tree", theta=0.5, threads=8,
+)
+simulation.step(256)</pre>
+        </div>
+      </div>
+      <div class="use-block">
+        <h3>From C++</h3>
+        <p>CMake 3.25 or later. The workflow presets configure, build and run the tests in one command. <code>bench/check_budgets.py</code> checks the budgets in the table above against a benchmark run, and the README gives the commands.</p>
+        <div class="code">
+          <button class="copy" type="button" data-copy="cpp">Copy</button>
+<pre id="cpp">git clone https://github.com/Protonicwave/barnes-hut-nbody
+cd barnes-hut-nbody
+cmake --workflow --preset dev
+cmake --workflow --preset release</pre>
+        </div>
+      </div>
+      <div class="use-block" style="grid-column: 1 / -1">
+        <h3>In the browser</h3>
+        <p>The threaded build needs two response headers on every file the page loads. Without them the browser withholds shared memory, and the page falls back to the single-threaded build. The simulation looks the same either way and runs more slowly on one thread. GitHub Pages cannot set these headers. <code>web/_headers</code> sets them on Cloudflare Pages, and <code>python web/serve.py</code> serves the directory locally with them.</p>
+        <ul class="headers">
+          <li>Cross-Origin-Opener-Policy: same-origin</li>
+          <li>Cross-Origin-Embedder-Policy: require-corp</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="sits">
+      <h3>Where this sits</h3>
+      <p>REBOUND, FDPS and GADGET-4 are the established codes in this area, and Bonsai is a GPU tree code. The closest browser project is nbody-simulator-webgl, which builds CPU, GPU and Barnes-Hut simulations from C++ to WebAssembly. This project adds threaded WebAssembly with a published scaling plot, a Python module you can install with pip, and an energy analysis checked against direct summation.</p>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>MIT licence.</span>
+    <a href="https://github.com/Protonicwave/barnes-hut-nbody">Source on GitHub</a>
+  </div>
+</footer>
+
 </body>
 </html>
