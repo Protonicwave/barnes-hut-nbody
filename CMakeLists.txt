@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(NBODY_BUILD_BENCH "Build the benchmark and accuracy programs" OFF)
+
 include(CTest)
 
 find_package(OpenMP REQUIRED COMPONENTS CXX)
@@ -33,4 +35,7 @@ target_link_libraries(nbody_core PRIVATE nbody_warnings OpenMP::OpenMP_CXX)
 
 if(BUILD_TESTING)
   add_subdirectory(tests)
+  if(NBODY_BUILD_BENCH)
+    add_subdirectory(bench)
+  endif()
 endif()

@@ -26,7 +26,7 @@
     {
       "name": "release",
       "inherits": "base",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "NBODY_BUILD_BENCH": "ON" }
     },
     {
       "name": "asan",
