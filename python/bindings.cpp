@@ -83,6 +83,11 @@ const double* data_of(std::span<const nbody::Vec3> vectors) {
     return reinterpret_cast<const double*>(vectors.data());
 }
 
+double potential_energy_of(const nbody::Simulation& simulation) {
+    return nbody::potential_energy(simulation.particles(), simulation.config().softening,
+                                   simulation.config().thread_count);
+}
+
 }  // namespace
 
 NB_MODULE(_core, module) {
@@ -100,7 +105,12 @@ NB_MODULE(_core, module) {
         return to_arrays(nbody::kepler_binary(eccentricity, semi_major_axis));
     }, nb::arg("eccentricity"), nb::arg("semi_major_axis"));
 
-    nb::class_<nbody::Simulation>(module, "Simulation")
+    nb::class_<nbody::Simulation>(
+        module, "Simulation",
+        "Leapfrog simulation of N bodies. Arguments are float64 arrays of shape (N, 3), (N, 3) "
+        "and (N,), copied on construction. Invalid settings raise ValueError naming the value; "
+        "step raises RuntimeError if a position or velocity becomes non-finite. step holds the "
+        "interpreter lock and cannot be interrupted. Not safe to share between threads.")
         .def("__init__", [](nbody::Simulation* self, const Vectors& positions,
                             const Vectors& velocities, const Scalars& masses, double dt,
                             double softening, const std::string& method, double theta,
@@ -135,13 +145,8 @@ NB_MODULE(_core, module) {
         .def("kinetic_energy", [](const nbody::Simulation& self) {
             return nbody::kinetic_energy(self.particles());
         })
-        .def("potential_energy", [](const nbody::Simulation& self) {
-            return nbody::potential_energy(self.particles(), self.config().softening,
-                                           self.config().thread_count);
-        })
+        .def("potential_energy", &potential_energy_of)
         .def("total_energy", [](const nbody::Simulation& self) {
-            return nbody::kinetic_energy(self.particles()) +
-                   nbody::potential_energy(self.particles(), self.config().softening,
-                                           self.config().thread_count);
+            return nbody::kinetic_energy(self.particles()) + potential_energy_of(self);
         });
 }

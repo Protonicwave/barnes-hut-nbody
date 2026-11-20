@@ -3,7 +3,7 @@
 Reads timing.json, force_error.csv and energy_drift.csv from the results
 directory and writes speed.png, scaling.png, force_error.png and
 energy_drift.png beside them. Amber is the tree and slate is direct
-summation, as on the browser page. Needs matplotlib.
+summation. Needs matplotlib.
 """
 
 import argparse

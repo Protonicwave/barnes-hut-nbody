@@ -1,4 +1,5 @@
 import gc
+import sys
 
 import numpy as np
 import pytest
@@ -54,7 +55,7 @@ def test_kepler_binary_has_two_bodies_and_rejects_eccentricity_one() -> None:
     positions, _, masses = bh.kepler_binary(0.5, 1.0)
     assert positions.shape == (2, 3)
     assert masses.sum() == pytest.approx(1.0)
-    with pytest.raises(ValueError, match="1"):
+    with pytest.raises(ValueError, match=r"eccentricity.*1"):
         bh.kepler_binary(1.0, 1.0)
 
 
@@ -103,23 +104,23 @@ def test_unknown_method_is_rejected_with_the_value() -> None:
 
 
 def test_non_positive_timestep_is_rejected_with_the_value() -> None:
-    with pytest.raises(ValueError, match="-2"):
+    with pytest.raises(ValueError, match=r"timestep.*got -2"):
         bh.Simulation(*bh.plummer_sphere(8, seed=1), dt=-2.0, softening=SOFTENING)
 
 
 def test_negative_softening_is_rejected_with_the_value() -> None:
-    with pytest.raises(ValueError, match="-1"):
+    with pytest.raises(ValueError, match=r"softening.*got -1"):
         bh.Simulation(*bh.plummer_sphere(8, seed=1), dt=TIMESTEP, softening=-1.0)
 
 
 def test_zero_threads_is_rejected_with_the_value() -> None:
-    with pytest.raises(ValueError, match="0"):
+    with pytest.raises(ValueError, match=r"thread count.*got 0"):
         make_simulation(threads=0)
 
 
 def test_mismatched_array_sizes_are_rejected() -> None:
     positions, velocities, masses = bh.plummer_sphere(8, seed=1)
-    with pytest.raises(ValueError, match="8"):
+    with pytest.raises(ValueError, match=r"equal sizes.*8, 8 and 4"):
         bh.Simulation(positions, velocities, masses[:4], dt=TIMESTEP, softening=SOFTENING)
 
 
@@ -153,9 +154,13 @@ def test_velocities_and_masses_are_read_only(name: str) -> None:
 
 
 def test_a_view_keeps_the_simulation_alive() -> None:
-    positions = make_simulation(64).positions
+    simulation = make_simulation(64)
+    references_before = sys.getrefcount(simulation)
+    views = (simulation.positions, simulation.velocities, simulation.masses)
+    assert sys.getrefcount(simulation) == references_before + len(views)
+    del views
     gc.collect()
-    assert np.isfinite(positions).all()
+    assert sys.getrefcount(simulation) == references_before
 
 
 def test_simulation_copies_its_inputs() -> None:
