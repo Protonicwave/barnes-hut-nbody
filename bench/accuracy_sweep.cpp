@@ -22,7 +22,6 @@
 #include <span>
 #include <stdexcept>
 #include <string>
-
 #include <thread>
 #include <vector>
 
@@ -53,12 +52,33 @@ double softening_for(std::size_t count, double scale) {
     return scale / std::sqrt(static_cast<double>(count));
 }
 
+// Parses with the given function, which reads a prefix of the text and sets the
+// length used, and rejects anything that is not the whole text.
+template <typename Parse>
+auto parse_whole(const std::string& text, const char* what, Parse parse) {
+    const auto invalid = [&] {
+        return std::invalid_argument(std::format("{} is not valid: '{}'", what, text));
+    };
+    try {
+        std::size_t used = 0;
+        const auto value = parse(text, &used);
+        if (used != text.size() || std::isspace(static_cast<unsigned char>(text[0]))) {
+            throw invalid();
+        }
+        return value;
+    } catch (const std::logic_error&) {  // invalid_argument or out_of_range from the parser
+        throw invalid();
+    }
+}
+
 std::size_t parse_count(const std::string& text) {
-    std::size_t used = 0;
     // stoull accepts a leading sign, which would wrap a negative count.
     const bool starts_with_digit = !text.empty() && std::isdigit(static_cast<unsigned char>(text[0]));
-    const std::size_t value = starts_with_digit ? std::stoull(text, &used) : 0;
-    if (!starts_with_digit || used != text.size() || value < 2 || value > MAX_COUNT) {
+    const std::size_t value =
+        starts_with_digit ? parse_whole(text, "count", [](const std::string& t, std::size_t* used) {
+            return static_cast<std::size_t>(std::stoull(t, used));
+        }) : 0;
+    if (value < 2 || value > MAX_COUNT) {
         throw std::invalid_argument(
             std::format("count must be a whole number from 2 to {}, got '{}'", MAX_COUNT, text));
     }
@@ -66,9 +86,10 @@ std::size_t parse_count(const std::string& text) {
 }
 
 double parse_end_time(const std::string& text) {
-    std::size_t used = 0;
-    const double value = std::stod(text, &used);
-    if (used != text.size() || !(value >= SAMPLE_INTERVAL) || !std::isfinite(value)) {
+    const double value = parse_whole(text, "end time", [](const std::string& t, std::size_t* used) {
+        return std::stod(t, used);
+    });
+    if (!(value >= SAMPLE_INTERVAL) || !std::isfinite(value)) {
         throw std::invalid_argument(
             std::format("end time must be finite and at least {}, got '{}'", SAMPLE_INTERVAL, text));
     }
@@ -86,7 +107,7 @@ void write_force_error(std::ostream& out, std::size_t count) {
     const double softening = softening_for(count, REFERENCE_SOFTENING_SCALE);
     const unsigned threads = thread_count();
     const auto direct = nbody::compute_accelerations(
-        particles, {softening, nbody::ForceMethod::direct, 0.5, threads});
+        particles, {softening, nbody::ForceMethod::direct, REFERENCE_THETA, threads});
     out << "theta,median,p90,p99,max\n";
     for (int tenths = 2; tenths <= 10; ++tenths) {
         const double theta = tenths / 10.0;
@@ -102,8 +123,7 @@ void write_force_error(std::ostream& out, std::size_t count) {
     }
 }
 
-// A plain record of one run's settings.
-struct DriftRun {  // NOLINT(misc-non-private-member-variables-in-classes)
+struct DriftRun {
     nbody::ForceMethod method;
     double theta;  // meaningful for the tree only
     double timestep;

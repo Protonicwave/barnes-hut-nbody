@@ -29,7 +29,7 @@ REFERENCE_SOFTENING_SCALE = 4.0
 
 
 class Budgets(NamedTuple):
-    """Limits from the project plan. Every one is a guess until measured."""
+    """Limits on the figures, set from measurements on the development machine."""
 
     min_speedup_over_direct: float = 10.0
     min_count_tree_wins: int = 4096

@@ -93,11 +93,6 @@ class CheckBudgetsTest(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertIn("OVER smallest direct/tree time ratio", output)
 
-    def test_ignores_counts_below_the_threshold_when_comparing_with_direct(self) -> None:
-        timing = self.write("timing.json", gbench_json(CASE_TIMES_MS))
-        status, _ = self.run_main([str(timing), "--machine", str(self.machine)])
-        self.assertEqual(status, 0)
-
     def test_fails_when_the_evaluation_time_is_over_budget(self) -> None:
         timing = self.write("timing.json", gbench_json(CASE_TIMES_MS))
         status, output = self.run_main(

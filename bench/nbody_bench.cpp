@@ -36,14 +36,14 @@ struct Case {
 };
 
 void register_cases(const char* name, nbody::ForceMethod method, const std::vector<Case>& cases) {
-    auto* benchmark = benchmark::RegisterBenchmark(name, force_evaluation, method);
+    auto* registration = benchmark::RegisterBenchmark(name, force_evaluation, method);
     for (const Case& entry : cases) {
-        benchmark->Args({entry.count, entry.threads});
+        registration->Args({entry.count, entry.threads});
     }
-    benchmark->UseRealTime()->Unit(benchmark::kMillisecond);
+    registration->UseRealTime()->Unit(benchmark::kMillisecond);
 }
 
-// Counts 2^first to 2^last, each on all threads.
+// Counts 2^first_exponent to 2^last_exponent, each on ALL_THREADS threads.
 std::vector<Case> powers_of_two(int first_exponent, int last_exponent) {
     std::vector<Case> cases;
     for (int exponent = first_exponent; exponent <= last_exponent; ++exponent) {

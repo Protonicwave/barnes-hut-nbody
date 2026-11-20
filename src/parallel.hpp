@@ -11,7 +11,8 @@ constexpr std::ptrdiff_t SCHEDULE_CHUNK = 16;
 
 // Calls body(i) for every i below count, on thread_count threads (at least 1).
 // Calls for different indices run concurrently, so each must write only
-// storage that no other index writes, and none may throw.
+// storage that no other index writes. An exception leaving body ends the
+// program, as it cannot cross the parallel region.
 template <typename Body>
 void parallel_for(std::size_t count, unsigned thread_count, const Body& body) {
     const auto signed_count = static_cast<std::ptrdiff_t>(count);
