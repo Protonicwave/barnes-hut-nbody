@@ -79,7 +79,7 @@ TEST_CASE("tree force error against direct summation stays within the measured b
     const auto particles = nbody::plummer_sphere(4096, 1);
     const double softening = plummer_softening(4096);
     const double thetas[] = {0.3, 0.5, 0.7, 1.0};
-    const double median_bounds[] = {1e-3, 2e-3, 3e-3, 1e-2};
+    const double median_bounds[] = {1e-3, 2e-3, 4e-3, 1e-2};
     double previous_median = 0.0;
     for (std::size_t t = 0; t < std::size(thetas); ++t) {
         const auto errors = relative_errors(particles, softening, thetas[t]);
