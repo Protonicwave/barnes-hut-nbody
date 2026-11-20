@@ -11,8 +11,8 @@ Units are N-body units with G = 1. The library provides:
   Morton-ordered octree with monopole cells. `ForceConfig::theta` sets the
   opening angle from 0 (exact, every cell opened) to 1. On a 4096-body
   Plummer sphere with softening 4/sqrt(N), the median relative force error
-  against direct summation is 2.5e-4 at theta 0.3, 1.1e-3 at 0.5, 2.7e-3 at
-  0.7 and 6.9e-3 at 1.0. Above about 0.7 is not recommended.
+  against direct summation is 3.8e-4 at theta 0.3, 1.4e-3 at 0.5, 3.0e-3 at
+  0.7 and 7.5e-3 at 1.0. Above about 0.7 is not recommended.
 - `Simulation`: leapfrog stepping of a `ParticleSet`.
 - `kinetic_energy`, `potential_energy`, `total_momentum`, `centre_of_mass`.
 - `plummer_sphere`, `uniform_sphere` and `kepler_binary` initial conditions.

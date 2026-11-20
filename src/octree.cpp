@@ -22,7 +22,7 @@ constexpr double CELLS_PER_AXIS = static_cast<double>(std::uint64_t{1} << MAX_DE
 constexpr double LAST_CELL_COORDINATE = CELLS_PER_AXIS - 1.0;
 
 // Cells holding at most this many particles are not subdivided.
-constexpr std::size_t LEAF_CAPACITY = 8;
+constexpr std::size_t LEAF_CAPACITY = 4;
 
 // A walk pops one cell and pushes at most eight, so the stack holds at most
 // 7 * MAX_DEPTH + 1 entries, within this capacity.
