@@ -46,6 +46,15 @@ jobs:
       - run: cmake --workflow --preset wasm-threads
       - run: cmake --workflow --preset wasm-single
       - run: node --test web/test/smoke.mjs
+      - name: Check isolation headers on the local server
+        run: |
+          python3 web/serve.py --port 8000 &
+          python3 web/serve.py --port 8001 --no-isolation &
+          shellcheck scripts/check_site_headers.sh
+          bash scripts/check_site_headers.sh http://127.0.0.1:8000
+          status=0
+          bash scripts/check_site_headers.sh http://127.0.0.1:8001 || status=$?
+          test "$status" -eq 1
 
   sanitisers:
     runs-on: ubuntu-latest
