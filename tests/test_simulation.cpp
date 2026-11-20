@@ -146,3 +146,28 @@ TEST_CASE("simulation reports the force configuration it was built with") {
     CHECK(simulation.config().theta == 0.7);
     CHECK(simulation.config().thread_count == 3);
 }
+
+TEST_CASE("switching from direct to the exact tree continues the same trajectory") {
+    const auto particles = nbody::plummer_sphere(128, 1);
+    const ForceConfig direct{.softening = 0.25};
+    Simulation reference(particles, direct, 1.0 / 128);
+    Simulation switched(particles, direct, 1.0 / 128);
+    reference.step(20);
+    switched.step(10);
+    switched.set_force_config({.softening = 0.25, .method = nbody::ForceMethod::tree, .theta = 0.0});
+    switched.step(10);
+    CHECK(switched.config().method == nbody::ForceMethod::tree);
+    CHECK(switched.time() == reference.time());
+    for (std::size_t i = 0; i < particles.size(); ++i) {
+        CHECK(nbody::test::distance(switched.particles().positions()[i],
+                                    reference.particles().positions()[i]) < 1e-10);
+    }
+}
+
+TEST_CASE("an invalid force configuration is rejected and the simulation keeps its own") {
+    Simulation simulation(nbody::kepler_binary(0.5, 1.0), ForceConfig{.softening = 0.1}, 0.01);
+    REQUIRE_THROWS_OF(simulation.set_force_config({.softening = 0.1, .theta = 1.5}),
+                      std::invalid_argument, "got 1.5");
+    CHECK(simulation.config().theta == 0.5);
+    CHECK(simulation.config().softening == 0.1);
+}

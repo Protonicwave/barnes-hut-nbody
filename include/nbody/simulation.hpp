@@ -20,6 +20,11 @@ public:
     // non-finite, or a velocity does; the state is then unspecified.
     void step(std::size_t count);
 
+    // Replaces the force configuration and recomputes the accelerations the
+    // next step starts from. Throws std::invalid_argument for an invalid
+    // configuration, leaving the simulation unchanged.
+    void set_force_config(const ForceConfig& replacement);
+
     const ParticleSet& particles() const { return particles_; }
     const ForceConfig& config() const { return config_; }
     double time() const { return static_cast<double>(steps_taken_) * timestep_; }

@@ -8,15 +8,11 @@
 
 namespace nbody {
 
-namespace {
-
 void check_theta(double theta) {
     if (!(theta >= 0.0 && theta <= 1.0)) {
         throw std::invalid_argument(std::format("theta must be in [0, 1], got {}", theta));
     }
 }
-
-}  // namespace
 
 void check_softening(double softening) {
     if (!std::isfinite(softening) || softening < 0.0) {

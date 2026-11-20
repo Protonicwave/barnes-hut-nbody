@@ -44,6 +44,7 @@ add_library(nbody_core
   src/forces.cpp
   src/direct.cpp
   src/octree.cpp
+  src/comparison.cpp
   src/simulation.cpp
   src/diagnostics.cpp
   src/setups.cpp)

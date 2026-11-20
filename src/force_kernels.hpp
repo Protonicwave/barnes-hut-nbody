@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
 #include <vector>
 
 #include "nbody/particles.hpp"
@@ -20,5 +21,10 @@ std::vector<Vec3> direct_accelerations(const ParticleSet& particles, double soft
                                        unsigned thread_count);
 std::vector<Vec3> tree_accelerations(const ParticleSet& particles, double softening_squared,
                                      double theta, unsigned thread_count);
+
+// Sources summed over all particles by the tree walk at the given opening
+// angle: accepted cells plus individual particles. Needs at least one particle.
+std::uint64_t tree_interaction_count(const ParticleSet& particles, double theta,
+                                     unsigned thread_count);
 
 }  // namespace nbody

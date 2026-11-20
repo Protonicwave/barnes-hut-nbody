@@ -3,12 +3,16 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <limits>
+#include <numeric>
+#include <stdexcept>
 #include <span>
 #include <utility>
 #include <vector>
 
 #include "force_kernels.hpp"
+#include "nbody/inspection.hpp"
 #include "parallel.hpp"
 
 namespace nbody {
@@ -17,7 +21,7 @@ namespace {
 
 // Cells are subdivided to at most this depth, so a Morton key of three bits
 // per level fits in 63 bits.
-constexpr unsigned MAX_DEPTH = 21;
+constexpr unsigned MAX_DEPTH = MAX_TREE_DEPTH;
 constexpr double CELLS_PER_AXIS = static_cast<double>(std::uint64_t{1} << MAX_DEPTH);
 constexpr double LAST_CELL_COORDINATE = CELLS_PER_AXIS - 1.0;
 
@@ -45,6 +49,10 @@ struct Node {
     std::uint8_t child_count = 0;  // zero for a leaf
     std::uint8_t depth = 0;
 };
+
+TreeCell to_cell(const Node& node) {
+    return {node.centre, node.size, node.depth, node.mass, node.centre_of_mass};
+}
 
 // Spreads the low 21 bits of a value so two zero bits follow each bit.
 constexpr std::uint64_t spread_bits(std::uint64_t value) {
@@ -103,11 +111,50 @@ public:
     // Index in the caller's order of the particle at the given tree-order index.
     [[nodiscard]] std::uint32_t original_index(std::size_t index) const { return original_index_[index]; }
 
+    // Position and mass of the particle at the given tree-order index.
+    [[nodiscard]] const Vec3& particle_position(std::size_t index) const { return positions_[index]; }
+    [[nodiscard]] double particle_mass(std::size_t index) const { return masses_[index]; }
+
+    // Number of sources the force on the particle at the given tree-order
+    // index is summed from: accepted cells plus individual particles.
+    [[nodiscard]] std::uint32_t interaction_count(std::size_t index, double theta) const;
+
+    // Cells from depth 2 to max_depth, outermost first.
+    [[nodiscard]] std::vector<TreeCell> cells_to_depth(unsigned max_depth) const;
+
+    // The walk for the particle at the given index in the caller's order.
+    [[nodiscard]] WalkTrace trace(std::size_t original, double theta) const;
+
 private:
     // Returns the Morton key of each particle, in tree order.
     std::vector<std::uint64_t> sort_particles(const ParticleSet& particles, const Box& box);
     void subdivide(const std::vector<std::uint64_t>& keys);
     void accumulate_mass();
+
+    // Visits the sources of the force on the particle at the given tree-order
+    // index. Calls visitor.open(node) for each cell that is not accepted,
+    // visitor.accept(node) for each cell summed as one source and
+    // visitor.visit(k) for each other particle in an opened leaf, k being its
+    // tree-order index.
+    template <typename Visitor>
+    void walk(std::size_t index, double theta, Visitor& visitor) const;
+
+    template <typename Visitor>
+    static void notify_open(Visitor& visitor, const Node& node) {
+        if constexpr (requires { visitor.open(node); }) {
+            visitor.open(node);
+        }
+    }
+
+    // Visits the particles of a leaf other than the one at the given index.
+    template <typename Visitor>
+    static void visit_leaf(const Node& leaf, std::size_t index, Visitor& visitor) {
+        for (std::size_t k = leaf.first; k < leaf.first + leaf.count; ++k) {
+            if (k != index) {
+                visitor.visit(k);
+            }
+        }
+    }
 
     std::vector<Node> nodes_;
     std::vector<Vec3> positions_;
@@ -219,34 +266,108 @@ void Octree::accumulate_mass() {
 // particle is never far enough for theta up to 1, because the centre of mass
 // and the particle are both inside it. Non-finite geometry compares false and
 // opens the cell.
-Vec3 Octree::acceleration_on(std::size_t index, double softening_squared, double theta) const {
+template <typename Visitor>
+void Octree::walk(std::size_t index, double theta, Visitor& visitor) const {
     const Vec3 position = positions_[index];
     std::array<std::uint32_t, WALK_STACK_CAPACITY> stack{};
     std::size_t depth = 0;
     stack.at(depth++) = 0;
-    Vec3 sum;
     while (depth > 0) {
         const Node& node = nodes_[stack.at(--depth)];
         if (node.child_count == 0) {
-            for (std::size_t k = node.first; k < node.first + node.count; ++k) {
-                if (k != index) {
-                    sum += pair_acceleration(positions_[k] - position, masses_[k],
-                                             softening_squared);
-                }
-            }
+            notify_open(visitor, node);
+            visit_leaf(node, index, visitor);
             continue;
         }
         const Vec3 offset = node.centre_of_mass - position;
         const double reach = node.size + theta * node.centre_offset;
         if (dot(offset, offset) * theta * theta > reach * reach) {
-            sum += pair_acceleration(offset, node.mass, softening_squared);
+            visitor.accept(node);
             continue;
         }
+        notify_open(visitor, node);
         for (std::size_t c = 0; c < node.child_count; ++c) {
             stack.at(depth++) = static_cast<std::uint32_t>(node.first_child + c);
         }
     }
-    return sum;
+}
+
+// Walk visitors. A visitor has accept(node) for a cell summed as one source
+// and visit(k) for a particle summed alone, and may add open(node), called
+// for every cell that is not accepted, leaves included.
+class ForceSum {
+public:
+    ForceSum(const Octree& tree, std::size_t index, double softening_squared)
+        : tree_(&tree), position_(tree.particle_position(index)),
+          softening_squared_(softening_squared) {}
+
+    void accept(const Node& node) {
+        sum_ += pair_acceleration(node.centre_of_mass - position_, node.mass, softening_squared_);
+    }
+    void visit(std::size_t k) {
+        sum_ += pair_acceleration(tree_->particle_position(k) - position_, tree_->particle_mass(k),
+                                  softening_squared_);
+    }
+    [[nodiscard]] const Vec3& sum() const { return sum_; }
+
+private:
+    const Octree* tree_;
+    Vec3 position_;
+    double softening_squared_;
+    Vec3 sum_;
+};
+
+class InteractionCount {
+public:
+    void accept(const Node&) { ++count_; }
+    void visit(std::size_t) { ++count_; }
+    [[nodiscard]] std::uint32_t count() const { return count_; }
+
+private:
+    std::uint32_t count_ = 0;
+};
+
+class TraceRecorder {
+public:
+    explicit TraceRecorder(const Octree& tree) : tree_(&tree) {}
+
+    void accept(const Node& node) { trace_.accepted.push_back(to_cell(node)); }
+    void open(const Node& node) { trace_.opened.push_back(to_cell(node)); }
+    void visit(std::size_t k) { trace_.particles.push_back(tree_->original_index(k)); }
+    WalkTrace take() { return std::move(trace_); }
+
+private:
+    const Octree* tree_;
+    WalkTrace trace_;
+};
+
+Vec3 Octree::acceleration_on(std::size_t index, double softening_squared, double theta) const {
+    ForceSum visitor(*this, index, softening_squared);
+    walk(index, theta, visitor);
+    return visitor.sum();
+}
+
+std::uint32_t Octree::interaction_count(std::size_t index, double theta) const {
+    InteractionCount visitor;
+    walk(index, theta, visitor);
+    return visitor.count();
+}
+
+std::vector<TreeCell> Octree::cells_to_depth(unsigned max_depth) const {
+    std::vector<TreeCell> cells;
+    for (const Node& node : nodes_) {
+        if (node.depth >= MIN_REPORTED_DEPTH && node.depth <= max_depth) {
+            cells.push_back(to_cell(node));
+        }
+    }
+    return cells;
+}
+
+WalkTrace Octree::trace(std::size_t original, double theta) const {
+    const auto found = std::ranges::find(original_index_, original);
+    TraceRecorder recorder(*this);
+    walk(static_cast<std::size_t>(found - original_index_.begin()), theta, recorder);
+    return recorder.take();
 }
 
 }  // namespace
@@ -262,6 +383,36 @@ std::vector<Vec3> tree_accelerations(const ParticleSet& particles, double soften
         accelerations[tree.original_index(k)] = tree.acceleration_on(k, softening_squared, theta);
     });
     return accelerations;
+}
+
+std::uint64_t tree_interaction_count(const ParticleSet& particles, double theta,
+                                     unsigned thread_count) {
+    const Octree tree(particles);
+    std::vector<std::uint32_t> counts(particles.size());
+    parallel_for(particles.size(), thread_count,
+                 [&](std::size_t k) { counts[k] = tree.interaction_count(k, theta); });
+    return std::accumulate(counts.begin(), counts.end(), std::uint64_t{0});
+}
+
+std::vector<TreeCell> tree_cells(const ParticleSet& particles, unsigned max_depth) {
+    if (max_depth < MIN_REPORTED_DEPTH || max_depth > MAX_TREE_DEPTH) {
+        throw std::invalid_argument(std::format("max depth must be from {} to {}, got {}",
+                                                MIN_REPORTED_DEPTH, MAX_TREE_DEPTH, max_depth));
+    }
+    if (particles.size() == 0) {
+        return {};
+    }
+    return Octree(particles).cells_to_depth(max_depth);
+}
+
+WalkTrace tree_walk_trace(const ParticleSet& particles, const ForceConfig& config,
+                          std::size_t index) {
+    check_theta(config.theta);
+    if (index >= particles.size()) {
+        throw std::invalid_argument(
+            std::format("particle index must be below {}, got {}", particles.size(), index));
+    }
+    return Octree(particles).trace(index, config.theta);
 }
 
 }  // namespace nbody
