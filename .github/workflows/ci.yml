@@ -38,7 +38,11 @@ jobs:
       # libgomp is not instrumented for the thread sanitiser and reports races
       # that are not there. LLVM's OpenMP runtime is, through the Archer tool.
       - run: echo "OMP_TOOL_LIBRARIES=$(find /usr/lib/llvm-*/lib -name libarcher.so | head -n 1)" >> "$GITHUB_ENV"
-      - run: cmake --workflow --preset tsan
+      - run: |
+          echo "OMP_TOOL_LIBRARIES=$OMP_TOOL_LIBRARIES"
+          cmake --preset tsan
+          cmake --build --preset tsan
+          ctest --test-dir build/tsan --output-on-failure
 
   macos:
     runs-on: macos-latest
