@@ -28,6 +28,25 @@ jobs:
       - run: .venv/bin/python -m pip install ".[test,plot]"
       - run: .venv/bin/python -m pytest -q
 
+  wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EMSDK_VERSION: 6.0.6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build
+      - name: Install Emscripten
+        run: |
+          git clone --depth 1 --branch "$EMSDK_VERSION" https://github.com/emscripten-core/emsdk "$HOME/emsdk"
+          "$HOME/emsdk/emsdk" install "$EMSDK_VERSION"
+          "$HOME/emsdk/emsdk" activate "$EMSDK_VERSION"
+          echo "EMSDK=$HOME/emsdk" >> "$GITHUB_ENV"
+          echo "$(dirname "$(echo "$HOME"/emsdk/node/*/bin/node)")" >> "$GITHUB_PATH"
+      - run: cmake --workflow --preset wasm-threads
+      - run: cmake --workflow --preset wasm-single
+      - run: node --test web/test/smoke.mjs
+
   sanitisers:
     runs-on: ubuntu-latest
     timeout-minutes: 30
