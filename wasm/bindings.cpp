@@ -199,8 +199,8 @@ public:
     }
 
     // The sources the force on one particle is summed from: accepted and
-    // opened cells in the layout of tree_cells, and the indices of the
-    // particles summed one by one. Throws an Error unless index is a whole
+    // opened cells in the layout of tree_cells, and the number of sources
+    // summed (accepted cells plus single particles). Throws an Error unless index is a whole
     // number below the particle count.
     [[nodiscard]] emscripten::val walk_trace(double index) const {
         return rethrow_as_js_error([&] {
@@ -211,8 +211,7 @@ public:
             emscripten::val result = emscripten::val::object();
             result.set("accepted", cells_array(trace.accepted));
             result.set("opened", cells_array(trace.opened));
-            result.set("particles", array_of(std::vector<double>(trace.particles.begin(),
-                                                                 trace.particles.end())));
+            result.set("interactions", trace.interaction_count());
             return result;
         });
     }

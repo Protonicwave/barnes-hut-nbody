@@ -68,6 +68,11 @@ def read_drift(path: Path) -> list[dict[str, Any]]:
                 continue
             point = [float(row["time"]), significant(float(row["relative_energy_error"]))]
             curves.setdefault((row["method"], theta), []).append(point)
+    missing = [
+        key for key in [("direct", None), *(("tree", t) for t in DRIFT_THETAS)] if key not in curves
+    ]
+    if missing:
+        raise ValueError(f"{path} has no reference run for {missing}")
     return [
         {"method": method, "theta": theta, "points": points}
         for (method, theta), points in sorted(

@@ -130,10 +130,8 @@ describe("both builds", () => {
       assert.throws(() => simulation.treeCells(6), /depth.*got 6/);
 
       const trace = simulation.walkTrace(3);
-      const counted = trace.accepted.length / 5 + trace.particles.length;
-      assert.ok(counted > 0 && counted < COUNT - 1);
+      assert.ok(trace.interactions > 0 && trace.interactions < COUNT - 1);
       assert.ok(trace.opened.length > 0);
-      assert.ok(!trace.particles.includes(3));
       assert.throws(() => simulation.walkTrace(COUNT), new RegExp(`index.*got ${COUNT}`));
       assert.throws(() => simulation.walkTrace(-1), /index.*got -1/);
       simulation.delete();
@@ -214,7 +212,7 @@ describe("page controls reach the simulation with the value their label shows", 
     const next = withChange(SMALL, "method", "direct");
     assert.equal(runner.change(next), "method");
     assert.deepEqual(lastCall(module.calls, "setForceSettings"), ["setForceSettings", "direct", 0.5, 1]);
-    assert.equal(labels(next).theta, "off");
+    assert.equal(labels(next).theta, "0.5");
     assert.equal(controlState(next).thetaDisabled, true);
     const after = frame(runner, { steps: 0 });
     assert.notEqual(after.seriesId, before.seriesId);
@@ -251,14 +249,14 @@ describe("page controls reach the simulation with the value their label shows", 
 
   it("timestep is the fraction the label shows", () => {
     TIMESTEP_LABELS.forEach((label, timestepIndex) => {
+      if (timestepIndex === SMALL.timestepIndex) {
+        return;
+      }
       const module = recording(single);
       const runner = new Runner(module, SMALL);
       runner.change(withChange(SMALL, "timestepIndex", timestepIndex));
       const [numerator, denominator] = label.split("/").map(Number);
-      const expected = timestepIndex === SMALL.timestepIndex ? undefined : numerator / denominator;
-      if (expected !== undefined) {
-        assert.equal(lastCall(module.calls, "create")[7], expected);
-      }
+      assert.equal(lastCall(module.calls, "create")[7], numerator / denominator);
       runner.close();
     });
   });
@@ -306,8 +304,8 @@ describe("page states", () => {
   it("a failed module load shows the failed state with a Reload button and locked controls", () => {
     const state = moduleState("failed", "single", 1);
     assert.deepEqual(
-      [state.showFailed, state.showReload, state.showLoading, state.controlsDisabled],
-      [true, true, false, true]);
+      [state.showFailed, state.showLoading, state.controlsDisabled],
+      [true, false, true]);
   });
 
   it("loading locks the controls and the single-threaded build explains itself", () => {

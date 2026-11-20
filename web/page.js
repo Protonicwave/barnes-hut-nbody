@@ -56,7 +56,7 @@ function setText(selector, text) {
   $(selector).textContent = text;
 }
 
-// ---------------------------------------------------------------- controls
+// Controls
 
 function syncControls() {
   const text = labels(settings);
@@ -103,7 +103,7 @@ function syncControls() {
 
   $("#stateLoading").dataset.show = String(module.showLoading);
   $("#stateFailed").dataset.show = String(module.showFailed);
-  $("#reloadBtn").hidden = !module.showReload;
+  $("#reloadBtn").hidden = !module.showFailed;
   $("#fallbackBanner").dataset.show = String(module.showBanner);
   setText("#modeBadge", module.badge);
   $("#liveDot").dataset.live = status === "ready" && view.running ? "on" : "off";
@@ -170,7 +170,7 @@ async function copyCode(button) {
   }
 }
 
-// ---------------------------------------------------------------- viewport
+// Viewport
 
 function fitViewport() {
   viewport.fit();
@@ -221,7 +221,7 @@ function draw() {
   });
 }
 
-// --------------------------------------------------------------- read-outs
+// Read outs
 
 function showMeasurement() {
   const ready = measurement && latest && measurement.count === latest.count;
@@ -295,7 +295,7 @@ function receiveFrame(message) {
   }
 }
 
-// ------------------------------------------------------------------ worker
+// Worker
 
 function fail(message) {
   status = "failed";
@@ -334,10 +334,11 @@ function requestFrames() {
     steps: view.running ? view.speed : 0,
     probe: probeIndex,
     wantCells: view.showCells,
+    resendCells: cells === null,
   });
 }
 
-// ----------------------------------------------------------------- results
+// Results
 
 async function loadFigures() {
   try {
@@ -391,4 +392,4 @@ async function start() {
   requestAnimationFrame(requestFrames);
 }
 
-start();
+start().catch((error) => fail(error.message));

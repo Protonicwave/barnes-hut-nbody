@@ -3,19 +3,16 @@
 // and the worker, so the label a visitor reads and the number the simulation
 // receives come from one place.
 
-export const SETUPS = ["plummer", "collapse", "kepler"];
 export const PARTICLE_COUNTS = [256, 512, 1024, 2048, 4096, 8192];
 export const KEPLER_PARTICLE_COUNT = 2;
 export const SOFTENING_SCALES = [1, 2, 4];
 export const TIMESTEPS = [1 / 256, 1 / 128, 1 / 64];
 export const TIMESTEP_LABELS = ["1/256", "1/128", "1/64"];
 export const THREAD_CHOICES = [1, 2, 4, 8];
-export const METHODS = ["direct", "tree"];
 
 // Colour bands of particle speed, from slowest to fastest.
 export const SPEED_BANDS = 14;
 
-export const THETA_RANGE = { min: 0.2, max: 1, step: 0.1 };
 // Opening angles above this are not recommended (Dehnen 2002).
 export const THETA_WARNING_ABOVE = 0.7;
 
@@ -87,7 +84,7 @@ export const energyInterval = (count) => (count > 2048 ? 32 : 16);
 export function labels(settings) {
   return {
     count: particleCount(settings).toLocaleString("en-GB"),
-    theta: settings.method === "direct" ? "off" : settings.theta.toFixed(1),
+    theta: settings.theta.toFixed(1),
     softening: settings.setup === "kepler" ? "0" : softening(settings).toFixed(3),
     timestep: TIMESTEP_LABELS[settings.timestepIndex],
     seed: `seed ${settings.seed}`,
@@ -120,7 +117,6 @@ export function moduleState(status, variant, threads) {
   return {
     showLoading: status === "loading",
     showFailed: status === "failed",
-    showReload: status === "failed",
     controlsDisabled: !ready,
     showBanner: ready && variant === "single",
     threadsDisabled: variant === "single",

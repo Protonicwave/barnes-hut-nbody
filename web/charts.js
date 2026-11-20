@@ -21,6 +21,13 @@ export const formatMilliseconds = (x) =>
 
 const ENERGY = { height: 160, margin: { left: 44, right: 8, top: 8, bottom: 22 }, lowDecade: -7, highDecade: -1 };
 const REFERENCE_DRIFT = 1e-3;
+const MAX_TIME_TICKS = 6;
+
+// The smallest of 1, 2 and 5 times a power of ten that is at least the step.
+function niceStep(step) {
+  const magnitude = 10 ** Math.floor(Math.log10(step));
+  return [1, 2, 5, 10].map((factor) => factor * magnitude).find((candidate) => candidate >= step);
+}
 const LABEL_GAP_PX = 13;
 
 // Relative energy error against time, on a log axis with a line at 1e-3.
@@ -29,18 +36,22 @@ export function drawEnergy(svg, samples, time, method) {
   const { height, margin: m, lowDecade, highDecade } = ENERGY;
   const plotWidth = width - m.left - m.right;
   const plotHeight = height - m.top - m.bottom;
-  const tMax = Math.max(time, 4);
-  const y = (e) =>
-    m.top + plotHeight * (1 - (Math.log10(Math.max(e, 10 ** lowDecade)) - lowDecade) / (highDecade - lowDecade));
-  const x = (t) => m.left + (plotWidth * t) / tMax;
+  const tMin = samples.length > 0 ? samples[0][0] : 0;
+  const tMax = Math.max(time, tMin + 4);
+  const span = tMax - tMin;
+  const y = (e) => {
+    const decade = Math.min(highDecade, Math.max(lowDecade, Math.log10(e)));
+    return m.top + plotHeight * (1 - (decade - lowDecade) / (highDecade - lowDecade));
+  };
+  const x = (t) => m.left + (plotWidth * (t - tMin)) / span;
   let markup = "";
   for (let decade = lowDecade; decade <= highDecade; decade += 2) {
     markup += `<line class="grid" x1="${m.left}" x2="${width - m.right}" y1="${y(10 ** decade)}" y2="${y(10 ** decade)}"/>` +
       `<text x="${m.left - 8}" y="${y(10 ** decade) + 4}" text-anchor="end">${powerOfTen(decade)}</text>`;
   }
   markup += `<line class="ref" x1="${m.left}" x2="${width - m.right}" y1="${y(REFERENCE_DRIFT)}" y2="${y(REFERENCE_DRIFT)}"/>`;
-  const tickStep = tMax > 12 ? 4 : tMax > 6 ? 2 : 1;
-  for (let t = 0; t <= tMax; t += tickStep) {
+  const tickStep = niceStep(span / MAX_TIME_TICKS);
+  for (let t = Math.ceil(tMin / tickStep) * tickStep; t <= tMax; t += tickStep) {
     markup += `<text x="${x(t)}" y="${height - 4}" text-anchor="middle">${t}</text>`;
   }
   markup += `<text x="${width - m.right}" y="${height - 4}" text-anchor="end" class="halo">time</text>`;
@@ -137,9 +148,13 @@ function timingSeries(rows, method, key, fixed) {
 function crossoverCount(rows) {
   const counts = [...new Set(rows.filter((row) => row.method === "direct" && row.threads === REFERENCE_THREADS).map((row) => row.count))].sort((a, b) => a - b);
   const wins = counts.map((count) => findTiming(rows, "tree", count, REFERENCE_THREADS) < findTiming(rows, "direct", count, REFERENCE_THREADS));
-  const lastLoss = wins.lastIndexOf(false);
-  return counts[lastLoss + 1];
+  return counts[wins.lastIndexOf(false) + 1] ?? null;
 }
+
+const crossoverSentence = (count) =>
+  count === null
+    ? "The tree does not overtake direct summation at any count measured, and is"
+    : `The tree overtakes direct summation at N = ${formatInteger(count)} and is`;
 
 function drawSpeed(data) {
   const rows = data.timing;
@@ -159,8 +174,8 @@ function drawSpeed(data) {
   const speedup = findTiming(rows, "direct", REFERENCE_COUNT, REFERENCE_THREADS) / findTiming(rows, "tree", REFERENCE_COUNT, REFERENCE_THREADS);
   const treeMs = findTiming(rows, "tree", REFERENCE_COUNT, REFERENCE_THREADS);
   document.getElementById("capTime").textContent =
-    `Direct summation grows as N², the tree as N log N. The tree overtakes direct summation at N = ${formatInteger(crossoverCount(rows))} ` +
-    `and is ${speedup.toFixed(1)} times faster at N = ${formatInteger(REFERENCE_COUNT)}, where one evaluation takes ${treeMs.toFixed(0)} ms. ` +
+    `Direct summation grows as N², the tree as N log N. ${crossoverSentence(crossoverCount(rows))} ` +
+    `${speedup.toFixed(1)} times faster at N = ${formatInteger(REFERENCE_COUNT)}, where one evaluation takes ${treeMs.toFixed(0)} ms. ` +
     "Median of five repetitions.";
 }
 
@@ -183,7 +198,7 @@ function drawThreads(data) {
   const measured = speedups.at(-1)[1];
   document.getElementById("capThreads").textContent =
     `One tree evaluation at N = ${formatInteger(REFERENCE_COUNT)}, against its own time on one thread. Eight threads give ${measured.toFixed(1)} times, ` +
-    `above the ${efficiency} P limit of ${(efficiency * cores).toFixed(1)} on this ${cores}-core machine. Results are bitwise identical at every thread count.`;
+    `${measured >= efficiency * cores ? "above" : "below"} the ${efficiency} P limit of ${(efficiency * cores).toFixed(1)} on this ${cores}-core machine.`;
 }
 
 function wasmRatio(runs, platform, threads) {

@@ -89,7 +89,8 @@ whatever the force method. Invalid arguments throw an `Error` naming the
 value. Also on `Simulation`: `setForceSettings(method, theta, threads)`,
 `evaluateForces(method)`, `compare(method)` (median and 99th-percentile force
 error against direct summation, and mean interactions per particle),
-`treeCells(maxDepth)` and `walkTrace(index)`. The views point into the heap, so read them before the next call. The
+`treeCells(maxDepth)` and `walkTrace(index)`. The views point into the heap, so
+read them before the next call. The
 threaded build needs a worker: it joins its threads with a blocking wait,
 which a page's main thread may not do, so `web/worker.js` runs the module.
 
@@ -114,7 +115,7 @@ GitHub Pages cannot send them. `web/_headers` sets them on Cloudflare Pages.
 single-threaded build with a banner saying so. In headless Chrome on the
 development machine the page loads in 256 ms to its largest paint on the
 single-threaded build, with no layout shift, and its own JavaScript is 15 KiB
-compressed. Lighthouse was not run.
+compressed.
 
 ## Build and test
 

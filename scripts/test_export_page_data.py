@@ -42,8 +42,18 @@ DRIFT_ROWS = (
 )
 
 
-def test_builds_every_section_from_the_results(tmp_path: Path) -> None:
+FULL_ROWS = "tree,0.7,0.0078125,4,0.125,3e-04\ntree,1,0.0078125,4,0.125,4e-04\n"
+
+
+def test_rejects_a_drift_file_missing_a_drawn_curve(tmp_path: Path) -> None:
     write_results(tmp_path, DRIFT_ROWS)
+
+    with pytest.raises(ValueError, match="no reference run"):
+        export_page_data.build(tmp_path)
+
+
+def test_builds_every_section_from_the_results(tmp_path: Path) -> None:
+    write_results(tmp_path, DRIFT_ROWS + FULL_ROWS)
 
     data = export_page_data.build(tmp_path)
 
@@ -56,7 +66,7 @@ def test_builds_every_section_from_the_results(tmp_path: Path) -> None:
 
 
 def test_keeps_only_the_reference_run_and_the_drawn_angles(tmp_path: Path) -> None:
-    write_results(tmp_path, DRIFT_ROWS)
+    write_results(tmp_path, DRIFT_ROWS + FULL_ROWS)
 
     curves = export_page_data.build(tmp_path)["drift"]["curves"]
 
@@ -64,13 +74,15 @@ def test_keeps_only_the_reference_run_and_the_drawn_angles(tmp_path: Path) -> No
         ("direct", None),
         ("tree", 0.3),
         ("tree", 0.5),
+        ("tree", 0.7),
+        ("tree", 1.0),
     ]
     assert curves[0]["points"] == [[0.0, 0.0], [0.125, 1.235e-06]]
     assert curves[2]["points"] == [[0.125, 2.346e-04]]
 
 
 def test_main_writes_the_file_and_creates_its_directory(tmp_path: Path) -> None:
-    write_results(tmp_path, DRIFT_ROWS)
+    write_results(tmp_path, DRIFT_ROWS + FULL_ROWS)
     output = tmp_path / "out" / "results.json"
 
     status = export_page_data.main(["--results", str(tmp_path), "--output", str(output)])

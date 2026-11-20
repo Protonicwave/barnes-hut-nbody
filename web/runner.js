@@ -23,7 +23,6 @@ const CELL_REFRESH_STEPS = 4;
 const FIRST_MEASURE_FRAME = 12;
 const REMEASURE_FRAMES = 150;
 
-const NUMBERS_PER_CELL = 5;
 const MIN_TIMING_MS = 0.001;
 
 export class Runner {
@@ -45,10 +44,6 @@ export class Runner {
     this.#now = now;
     this.#settings = settings;
     this.#create();
-  }
-
-  get settings() {
-    return this.#settings;
   }
 
   // Applies new settings and returns what kind of change they were.
@@ -77,7 +72,7 @@ export class Runner {
 
   // Takes up to `steps` steps, stopping early once `budgetMs` has passed, and
   // returns the message for the page and the buffers to transfer with it.
-  frame({ steps, budgetMs, probe, wantCells }) {
+  frame({ steps, budgetMs, probe, wantCells, resendCells = false }) {
     const taken = this.#advance(steps, budgetMs);
     if (taken > 0) {
       this.#frames += 1;
@@ -93,7 +88,7 @@ export class Runner {
       samples: this.#pendingSamples,
       positions,
       bands,
-      cells: this.#cells(wantCells),
+      cells: this.#cells(wantCells, resendCells),
       probe: this.#probe(probe, count),
       measurement: this.#measurementDue() ? this.#measure() : null,
     };
@@ -157,10 +152,13 @@ export class Runner {
 
   // The octree cells to draw, or null when the page has them already, does
   // not want them, or the setup has no tree worth drawing.
-  #cells(wanted) {
+  #cells(wanted, resend) {
     if (!wanted || this.#settings.setup === "kepler") {
       this.#stepsSinceCells = Infinity;
       return null;
+    }
+    if (resend) {
+      this.#stepsSinceCells = Infinity;
     }
     if (this.#stepsSinceCells < CELL_REFRESH_STEPS) {
       return null;
@@ -176,7 +174,7 @@ export class Runner {
     const trace = this.#simulation.walkTrace(index);
     return {
       index,
-      interactions: trace.accepted.length / NUMBERS_PER_CELL + trace.particles.length,
+      interactions: trace.interactions,
       accepted: trace.accepted,
       opened: trace.opened,
     };
