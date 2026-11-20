@@ -44,6 +44,11 @@ void Simulation::step(std::size_t count) {
         accelerations_ = compute_accelerations(particles_, config_);
         for (std::size_t i = 0; i < particles_.size(); ++i) {
             velocities[i] += half_step * accelerations_[i];
+            if (!is_finite(velocities[i])) {
+                throw std::runtime_error(
+                    std::format("velocity of particle {} became non-finite at step {}", i,
+                                steps_taken_ + 1));
+            }
         }
         ++steps_taken_;
     }

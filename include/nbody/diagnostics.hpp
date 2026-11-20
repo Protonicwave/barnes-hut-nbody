@@ -5,6 +5,8 @@
 
 namespace nbody {
 
+// The sums below overflow to infinity for masses near the double maximum, and
+// coincident particles with zero softening give an infinite potential energy.
 double kinetic_energy(const ParticleSet& particles);
 
 // Softened pair sum of -m_i m_j / sqrt(r^2 + softening^2). Throws

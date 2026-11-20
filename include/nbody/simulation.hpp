@@ -17,7 +17,7 @@ public:
 
     // Advances by count steps. Does nothing for an empty particle set. Throws
     // std::runtime_error naming the particle and step when a position becomes
-    // non-finite; the state is then unspecified.
+    // non-finite, or a velocity does; the state is then unspecified.
     void step(std::size_t count);
 
     const ParticleSet& particles() const { return particles_; }

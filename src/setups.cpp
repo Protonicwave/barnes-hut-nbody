@@ -21,8 +21,8 @@ public:
 
     // Uniform in the open interval (0, 1).
     double next() {
-        constexpr double SCALE = 1.0 / 9007199254740992.0;  // 2^-53
-        return (static_cast<double>(engine_() >> 11) + 0.5) * SCALE;
+        constexpr double SCALE = 1.0 / 4503599627370496.0;  // 2^-52
+        return (static_cast<double>(engine_() >> 12) + 0.5) * SCALE;
     }
 
     // Unit vector uniform on the sphere.
@@ -121,9 +121,10 @@ ParticleSet kepler_binary(double eccentricity, double semi_major_axis) {
     const double relative_speed =
         std::sqrt(TOTAL_MASS * (2.0 / separation - 1.0 / semi_major_axis));
     // Equal masses: each body carries half the relative offset and velocity.
+    constexpr double BODY_MASS = 0.5 * TOTAL_MASS;
     return {{{-0.5 * separation, 0.0, 0.0}, {0.5 * separation, 0.0, 0.0}},
             {{0.0, -0.5 * relative_speed, 0.0}, {0.0, 0.5 * relative_speed, 0.0}},
-            {0.5, 0.5}};
+            {BODY_MASS, BODY_MASS}};
 }
 
 }  // namespace nbody

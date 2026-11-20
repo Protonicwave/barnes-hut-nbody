@@ -127,3 +127,10 @@ TEST_CASE("a position overflowing to infinity throws naming particle and step") 
     REQUIRE_THROWS_OF(simulation.step(3), std::runtime_error,
                       "position of particle 0 became non-finite at step 1");
 }
+
+TEST_CASE("particles meeting with zero softening throw naming particle and step") {
+    Simulation simulation(ParticleSet({{0, 0, 0}, {1, 0, 0}}, {{}, {}}, {1.0, 1.0}),
+                          ForceConfig{}, 1.0);
+    REQUIRE_THROWS_OF(simulation.step(1), std::runtime_error,
+                      "velocity of particle 0 became non-finite at step 1");
+}
