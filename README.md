@@ -6,6 +6,8 @@ stepping uses kick-drift-kick leapfrog with a fixed timestep. Force loops run
 on OpenMP threads. A Python module wraps the library, and the same core builds to
 WebAssembly for the browser, single-threaded or on worker threads.
 
+The simulator runs in the browser at https://barnes-hut-nbody.pages.dev/.
+
 Units are N-body units with G = 1. The library provides:
 
 - `compute_accelerations`: softened accelerations by direct summation or by a
@@ -118,6 +120,14 @@ single-threaded build with a banner saying so. In headless Chrome on the
 development machine the page loads in 256 ms to its largest paint on the
 single-threaded build, with no layout shift, and its own JavaScript is 15 KiB
 compressed.
+
+The `deploy` job in `.github/workflows/ci.yml` publishes `web/`, with both
+Wasm builds and without the Python and test files, to Cloudflare Pages on every
+push to `main` that passes the `wasm` job. It then runs
+`bash scripts/check_site_headers.sh BASE_URL`, which fetches the page, its
+worker and the Wasm files and fails unless each carries the two headers above and
+the modules are served as `application/wasm`. The same command checks any
+served copy, such as `http://127.0.0.1:8000`.
 
 ## Build and test
 
