@@ -24,6 +24,11 @@ Simulation::Simulation(ParticleSet particles, ForceConfig config, double timeste
     accelerations_ = compute_accelerations(particles_, config_);
 }
 
+void Simulation::set_force_config(const ForceConfig& replacement) {
+    accelerations_ = compute_accelerations(particles_, replacement);
+    config_ = replacement;
+}
+
 void Simulation::step(std::size_t count) {
     if (particles_.size() == 0) {
         return;
