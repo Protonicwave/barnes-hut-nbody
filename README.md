@@ -125,7 +125,7 @@ The `deploy` job in `.github/workflows/ci.yml` publishes `web/`, with both
 Wasm builds and without the Python and test files, to Cloudflare Pages on every
 push to `main` that passes the `wasm` job. It then runs
 `bash scripts/check_site_headers.sh BASE_URL`, which fetches the page, its
-worker and both modules and fails unless each carries the two headers above and
+worker and the Wasm files and fails unless each carries the two headers above and
 the modules are served as `application/wasm`. The same command checks any
 served copy, such as `http://127.0.0.1:8000`.
 

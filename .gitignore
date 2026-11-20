@@ -5,3 +5,4 @@ build/
 *.gcno
 __pycache__/
 web/wasm/
+.wrangler/

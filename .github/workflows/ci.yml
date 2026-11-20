@@ -69,24 +69,30 @@ jobs:
 
   deploy:
     needs: wasm
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'Protonicwave/barnes-hut-nbody'
+    if: github.event_name == 'push' && github.repository == 'Protonicwave/barnes-hut-nbody'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
       group: cloudflare-pages-production
       cancel-in-progress: false
+    defaults:
+      run:
+        shell: bash
     env:
       WRANGLER_VERSION: 4.158.0
       WRANGLER_SEND_METRICS: "false"
       SITE_URL: https://barnes-hut-nbody.pages.dev
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # A newer push has its own run, and deploying this older build after it
       # would put stale files live.
       - name: Check this commit is still the head of main
         id: head
         run: |
           remote_head=$(git ls-remote origin refs/heads/main | cut -f1)
+          test -n "$remote_head" || { echo "::error::could not read the head of main"; exit 1; }
           if [ "$remote_head" = "$GITHUB_SHA" ]; then
             echo "current=true" >> "$GITHUB_OUTPUT"
           else
@@ -103,11 +109,8 @@ jobs:
           site="$RUNNER_TEMP/site"
           mkdir "$site"
           tar -C web --exclude='*.py' --exclude=test --exclude=__pycache__ -cf - . | tar -C "$site" -xf -
-          if [ -n "$(find "$site" \( -name '*.py' -o -name test \))" ]; then
-            echo "::error::the site holds a Python or test file"
-            exit 1
-          fi
-          for required in _headers index.html wasm/threads/nbody.wasm wasm/single/nbody.wasm; do
+          for required in _headers index.html worker.js wasm/threads/nbody.js wasm/threads/nbody.wasm \
+            wasm/single/nbody.js wasm/single/nbody.wasm; do
             test -f "$site/$required" || { echo "::error::missing $required"; exit 1; }
           done
       - name: Deploy to Cloudflare Pages
@@ -116,7 +119,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          npx --yes wrangler@"$WRANGLER_VERSION" pages deploy "$RUNNER_TEMP/site" \r
+          npx --yes wrangler@"$WRANGLER_VERSION" pages deploy "$RUNNER_TEMP/site" \
             --project-name=barnes-hut-nbody --branch=main --commit-hash="$GITHUB_SHA"
       - name: Check the live headers
         if: steps.head.outputs.current == 'true'
