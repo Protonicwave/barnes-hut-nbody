@@ -32,6 +32,9 @@ struct ForceConfig {
 // Throws std::invalid_argument unless the softening is finite and not negative.
 void check_softening(double softening);
 
+// Throws std::invalid_argument unless theta is from 0 to 1.
+void check_theta(double theta);
+
 // Throws std::invalid_argument unless the count is from 1 to MAX_THREADS.
 void check_thread_count(unsigned thread_count);
 
