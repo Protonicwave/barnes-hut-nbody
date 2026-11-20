@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "nbody/forces.hpp"
+#include "parallel.hpp"
 
 namespace nbody {
 
@@ -17,20 +18,21 @@ double kinetic_energy(const ParticleSet& particles) {
     return sum;
 }
 
-double potential_energy(const ParticleSet& particles, double softening) {
+double potential_energy(const ParticleSet& particles, double softening, unsigned thread_count) {
     check_softening(softening);
+    check_thread_count(thread_count);
     const auto positions = particles.positions();
     const auto masses = particles.masses();
     const double softening_squared = softening * softening;
     std::vector<double> partial_sums(particles.size());
-    for (std::size_t i = 0; i < particles.size(); ++i) {
+    parallel_for(particles.size(), thread_count, [&](std::size_t i) {
         double sum = 0.0;
         for (std::size_t j = i + 1; j < particles.size(); ++j) {
             const Vec3 offset = positions[j] - positions[i];
             sum -= masses[j] / std::sqrt(dot(offset, offset) + softening_squared);
         }
         partial_sums[i] = masses[i] * sum;
-    }
+    });
     double total = 0.0;
     for (const double partial : partial_sums) {
         total += partial;

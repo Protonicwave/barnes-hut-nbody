@@ -25,14 +25,22 @@ void check_softening(double softening) {
     }
 }
 
+void check_thread_count(unsigned thread_count) {
+    if (thread_count < 1 || thread_count > MAX_THREADS) {
+        throw std::invalid_argument(std::format(
+            "thread count must be from 1 to {}, got {}", MAX_THREADS, thread_count));
+    }
+}
+
 std::vector<Vec3> compute_accelerations(const ParticleSet& particles, const ForceConfig& config) {
     check_softening(config.softening);
     check_theta(config.theta);
+    check_thread_count(config.thread_count);
     const double softening_squared = config.softening * config.softening;
     if (config.method == ForceMethod::tree) {
-        return tree_accelerations(particles, softening_squared, config.theta);
+        return tree_accelerations(particles, softening_squared, config.theta, config.thread_count);
     }
-    return direct_accelerations(particles, softening_squared);
+    return direct_accelerations(particles, softening_squared, config.thread_count);
 }
 
 }  // namespace nbody

@@ -40,7 +40,11 @@
       "name": "msvc",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
-      "cacheVariables": { "CMAKE_CXX_COMPILER": "cl", "CMAKE_BUILD_TYPE": "Release" }
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "cl",
+        "CMAKE_BUILD_TYPE": "Release",
+        "OpenMP_RUNTIME_MSVC": "llvm"
+      }
     }
   ],
   "buildPresets": [

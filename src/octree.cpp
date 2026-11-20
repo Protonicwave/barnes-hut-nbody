@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "force_kernels.hpp"
+#include "parallel.hpp"
 
 namespace nbody {
 
@@ -251,15 +252,15 @@ Vec3 Octree::acceleration_on(std::size_t index, double softening_squared, double
 }  // namespace
 
 std::vector<Vec3> tree_accelerations(const ParticleSet& particles, double softening_squared,
-                                     double theta) {
+                                     double theta, unsigned thread_count) {
     if (particles.size() == 0) {
         return {};
     }
     const Octree tree(particles);
     std::vector<Vec3> accelerations(particles.size());
-    for (std::size_t k = 0; k < particles.size(); ++k) {
+    parallel_for(particles.size(), thread_count, [&](std::size_t k) {
         accelerations[tree.original_index(k)] = tree.acceleration_on(k, softening_squared, theta);
-    }
+    });
     return accelerations;
 }
 
