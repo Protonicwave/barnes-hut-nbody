@@ -2,6 +2,7 @@ import csv
 import json
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import pytest
 
 import plot_results
@@ -81,3 +82,39 @@ def test_drift_curves_drop_the_zero_error_start(tmp_path: Path) -> None:
 def test_missing_results_directory_is_an_error(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         plot_results.main(["--results", str(tmp_path / "absent")])
+
+
+def luminance(colour: str) -> float:
+    """WCAG relative luminance of a `#rrggbb` colour."""
+    channels = [int(colour[index : index + 2], 16) / 255 for index in (1, 3, 5)]
+    linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def contrast(foreground: str, background: str) -> float:
+    lighter, darker = sorted((luminance(foreground), luminance(background)), reverse=True)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def test_writes_a_dark_variant_of_every_figure(tmp_path: Path) -> None:
+    write_results(tmp_path)
+    assert plot_results.main(["--results", str(tmp_path)]) == 0
+    for name in ("speed", "scaling", "force_error", "energy_drift"):
+        assert (tmp_path / f"{name}-dark.png").stat().st_size > 1000, name
+
+
+def test_dark_figures_sit_on_the_dark_page_colour(tmp_path: Path) -> None:
+    write_results(tmp_path)
+    plot_results.main(["--results", str(tmp_path)])
+    expected = tuple(int(plot_results.DARK.page[index : index + 2], 16) for index in (1, 3, 5))
+    for name in ("speed", "scaling", "force_error", "energy_drift"):
+        image = plt.imread(tmp_path / f"{name}-dark.png")
+        corner = tuple(round(float(channel) * 255) for channel in image[0, 0, :3])
+        assert corner == expected, name
+
+
+def test_dark_data_colours_are_readable_on_the_dark_page() -> None:
+    dark = plot_results.DARK
+    colours = (dark.direct, dark.tree, dark.tree_soft, *dark.thetas)
+    for colour in colours:
+        assert contrast(colour, dark.page) >= 3.0, colour
