@@ -1,32 +1,102 @@
 # barnes-hut-nbody
 
-A gravitational N-body simulator in C++20. Forces come from direct
-summation or a Barnes-Hut octree, both with Plummer softening, and time
-stepping uses kick-drift-kick leapfrog with a fixed timestep. Force loops run
-on OpenMP threads. A Python module wraps the library, and the same core builds to
-WebAssembly for the browser, single-threaded or on worker threads.
+[![ci](https://github.com/Protonicwave/barnes-hut-nbody/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Protonicwave/barnes-hut-nbody/actions/workflows/ci.yml)
 
-The simulator runs in the browser at https://barnes-hut-nbody.pages.dev/.
+A gravitational N-body simulator in C++20 that uses a Barnes-Hut octree, runs its force loops on threads, and compiles to WebAssembly for the browser.
 
-Units are N-body units with G = 1. The library provides:
+**Try it: https://barnes-hut-nbody.pages.dev/**
 
-- `compute_accelerations`: softened accelerations by direct summation or by a
-  Morton-ordered octree with monopole cells. `ForceConfig::theta` sets the
-  opening angle from 0 (exact, every cell opened) to 1. On a 4096-body
-  Plummer sphere with softening 4/sqrt(N), the median relative force error
-  against direct summation is 3.8e-4 at theta 0.3, 1.4e-3 at 0.5, 3.0e-3 at
-  0.7 and 7.5e-3 at 1.0. Above about 0.7 is not recommended.
-- `Simulation`: leapfrog stepping of a `ParticleSet`.
-- `kinetic_energy`, `potential_energy`, `total_momentum`, `centre_of_mass`.
-- `plummer_sphere`, `uniform_sphere` and `kepler_binary` initial conditions.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/hero-dark.png">
+  <img alt="The simulator page running a Plummer sphere, with the octree cells and live timings of direct and tree force evaluation" src="docs/screenshots/hero-light.png">
+</picture>
 
-## Python
+## Method
 
-    pip install .
+Every particle attracts every other under Newtonian gravity with Plummer softening $`\epsilon`$, in units where $`G = 1`$. The acceleration of particle $`i`$ is
 
-installs `barnes_hut` (Python 3.10 or later, NumPy 1.26 or later) and builds
-the C++ core with CMake, Ninja and a C++20 compiler with OpenMP. Wheels for
-Linux, Windows and macOS on Apple silicon are built by the `wheels` workflow.
+```math
+\mathbf{a}_i = \sum_{j \neq i} \frac{m_j \,(\mathbf{r}_j - \mathbf{r}_i)}{\left(\lvert \mathbf{r}_j - \mathbf{r}_i \rvert^2 + \epsilon^2\right)^{3/2}}
+```
+
+Summing it directly takes $`N(N-1)`$ terms, so the cost grows as $`N^2`$.
+
+The tree method groups distant particles. The particles go into an octree built in Morton order, and each cell stands in for its contents as one source of mass at their centre of mass. For a particle at distance $`d`$ from a cell of side $`s`$, the cell is used whole when
+
+```math
+d > \frac{s}{\theta} + \delta
+```
+
+where $`\delta`$ is the distance between the cell's centre of mass and its geometric centre (Barnes 1994). With $`\delta = 0`$ this is the familiar $`s/d < \theta`$. Otherwise the cell is opened and its children are tested in turn, down to leaves of at most 4 particles, which are summed pairwise. The opening angle $`\theta`$ sets the trade: 0 opens every cell and reproduces the direct sum, and values above about 0.7 are not recommended. For a bounded, roughly uniform distribution the expected cost is $`O(N \log N)`$.
+
+Time stepping is kick-drift-kick leapfrog with a fixed timestep $`\Delta t`$:
+
+```math
+\begin{aligned}
+\mathbf{v}_{n+1/2} &= \mathbf{v}_n + \tfrac{\Delta t}{2}\,\mathbf{a}_n \\
+\mathbf{r}_{n+1} &= \mathbf{r}_n + \Delta t\,\mathbf{v}_{n+1/2} \\
+\mathbf{v}_{n+1} &= \mathbf{v}_{n+1/2} + \tfrac{\Delta t}{2}\,\mathbf{a}_{n+1}
+\end{aligned}
+```
+
+The scheme is symplectic and second order. The total energy is
+
+```math
+E = \sum_i \tfrac{1}{2} m_i v_i^2 \; - \sum_{i<j} \frac{m_i m_j}{\sqrt{r_{ij}^2 + \epsilon^2}}
+```
+
+and the potential is always summed directly, whichever method computed the forces, so the tree's error is measured against an exact reference. The energy error reported below is $`\lvert E(t) - E_0 \rvert / \lvert E_0 \rvert`$.
+
+The test problem is a Plummer sphere in virial units, with $`M = G = 1`$ and $`E = -1/4`$, softened by $`\epsilon = 4/\sqrt{N}`$.
+
+## Results
+
+Medians of 5 repetitions on an Intel Core Ultra 5 238V (4 performance and 4 efficiency cores), g++ 16.2.0, 8 threads, $`\theta = 0.5`$. A tree evaluation includes building the tree.
+
+| N | direct (ms) | tree (ms) |
+|---:|---:|---:|
+| 4096 | 11.7 | 6.4 |
+| 16384 | 183.5 | 44.7 |
+| 32768 | 686.3 | 102.6 |
+| 65536 | 2739.0 | 253.4 |
+
+The tree wins from N = 4096 and is 10.8 times faster at N = 65536. On that size the tree takes 896.8 ms on one thread and 253.4 ms on eight, a speedup of 3.5. The tree build is serial.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="results/speed-dark.png">
+  <img alt="Force evaluation time against N, direct summation and tree" src="results/speed.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="results/scaling-dark.png">
+  <img alt="Tree speedup over one thread against thread count" src="results/scaling.png">
+</picture>
+
+The speed costs accuracy, set by $`\theta`$. At N = 16384 the median relative force error against direct summation is 3.0e-4 at $`\theta = 0.3`$, 1.0e-3 at 0.5, 2.3e-3 at 0.7 and 6.1e-3 at 1.0. At 0.5 the 99th percentile is 5.3e-3.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="results/force_error-dark.png">
+  <img alt="Median and 99th-percentile force error against the opening angle" src="results/force_error.png">
+</picture>
+
+Over 28.25 time units, about ten crossing times, at N = 4096 with $`\Delta t = 1/128`$, the energy error of the tree at $`\theta = 0.5`$ stays below 8.2e-5. Direct summation at the same settings stays below 3.0e-6. The tree's error does not depend on the timestep: the opening angle sets it, while direct summation's falls with the square of $`\Delta t`$.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="results/energy_drift-dark.png">
+  <img alt="Relative energy error over time for direct summation and the tree at several opening angles" src="results/energy_drift.png">
+</picture>
+
+The same core compiles to WebAssembly. One tree force evaluation at N = 16384 takes 1.03 times as long as native on one thread and 1.01 times as long on eight, under Node 26.4.0.
+
+Results are bitwise identical for every thread count, and between the single-threaded and threaded WebAssembly builds. The commands that produced each figure are in [docs/reproducing.md](docs/reproducing.md).
+
+## Quick start
+
+From Python:
+
+```
+pip install .
+```
 
 ```python
 import numpy as np
@@ -43,34 +113,7 @@ simulation.step(256)
 print(simulation.time, abs(simulation.total_energy() - start) / abs(start))
 ```
 
-`method` is `"tree"` or `"direct"`; `theta` is from 0 to 1 and `threads` from 1
-to 256. Invalid settings raise `ValueError` naming the value, and a particle
-leaving the finite range raises `RuntimeError`. `positions`, `velocities` and
-`masses` are read-only NumPy views of the simulation state, with no copy: they
-follow `step`, and keep the simulation alive. The constructor copies its
-inputs. `plummer_sphere`, `uniform_sphere` and `kepler_binary` return the
-three arrays the constructor takes. `step` holds the Python interpreter lock
-for the whole call, and a `Simulation` must not be used from two threads at
-once. The tests run with `python -m pytest`, after `pip install ".[test,plot]"`.
-
-## WebAssembly
-
-The core builds with Emscripten 6.0.6 in two variants. `wasm-threads` runs the
-force loops on `std::thread` workers, a pool of 7 started with the module,
-and `wasm-single` runs them on the calling thread. Results are bitwise
-identical between the two.
-Install emsdk, activate it so that `EMSDK` is set, then from the repository
-root:
-
-    cmake --workflow --preset wasm-threads
-    cmake --workflow --preset wasm-single
-    node --test web/test/smoke.mjs
-
-Each workflow builds the Catch2 suite and runs it under Node. The Embind
-module is written to `web/wasm/threads/` and `web/wasm/single/`, as
-`nbody.js` and `nbody.wasm`, and the smoke test drives both. The heap is fixed
-at 256 MiB, which holds 65536 particles with the tree or direct summation, the
-limit the module enforces.
+From JavaScript, after building the WebAssembly module:
 
 ```js
 import createModule from "./wasm/threads/nbody.js";
@@ -84,168 +127,10 @@ const error = Math.abs(simulation.energy() - simulation.initialEnergy())
   / Math.abs(simulation.initialEnergy());
 ```
 
-`setup` is `"plummer"`, `"collapse"` or `"kepler"` (two bodies, eccentricity
-0.5, semi-major axis 1, which ignore the count and seed). `step` takes 1 to
-1024 steps. `energy` is the kinetic energy plus the direct softened potential,
-whatever the force method. Invalid arguments throw an `Error` naming the
-value. Also on `Simulation`: `setForceSettings(method, theta, threads)`,
-`evaluateForces(method)`, `compare(method)` (median and 99th-percentile force
-error against direct summation, and mean interactions per particle),
-`treeCells(maxDepth)` and `walkTrace(index)`, which also gives the centre of
-mass of each accepted cell. The views point into the heap, so
-read them before the next call. The
-threaded build needs a worker: it joins its threads with a blocking wait,
-which a page's main thread may not do, so `web/worker.js` runs the module.
+## Documentation
 
-`web/index.html` is the simulator page. It runs the module in the worker
-`web/worker.js` and draws the particles, the octree cells and one particle's
-tree walk, with live timings of direct and tree evaluation, the relative energy
-error, and the results figures below. The panel opens with a run record, the
-Python call that repeats the run on screen, and three conservation meters:
-the relative energy error, the change in total momentum and the shift of the
-centre of mass, each since the start of the run or the last method change. `web/data/results.json` holds the figures
-it draws, written from `results/` by `python scripts/export_page_data.py`. The
-fonts in `web/fonts/` are Source Serif 4, Source Sans 3 and Source Code Pro
-under the SIL Open Font Licence. Screenshots are in `docs/screenshots/`.
-
-Threads need
-shared memory, and browsers allow that only on a cross-origin isolated page,
-which means two response headers:
-
-    Cross-Origin-Opener-Policy: same-origin
-    Cross-Origin-Embedder-Policy: require-corp
-
-GitHub Pages cannot send them. `web/_headers` sets them on Cloudflare Pages.
-`serve.bat` on Windows, or `python web/serve.py`, serves the directory locally
-at http://127.0.0.1:8000/ with them (the batch file also opens the page, and
-needs the Wasm builds above in place), and
-`--no-isolation` leaves them out, which shows the page fall back to the
-single-threaded build with a banner saying so. In headless Chrome on the
-development machine the page loads in 0.6 s to its largest paint on the
-single-threaded build, with no layout shift, and its own JavaScript is 23 KiB
-compressed. `web/test/page_budget.mjs` measures those figures and the time of
-one viewport draw at 8192 particles, prints each beside its budget and exits 1
-when any is over:
-
-    node web/test/page_budget.mjs --chrome "C:\Program Files\Google\Chrome\Application\chrome.exe"
-
-The `deploy` job in `.github/workflows/ci.yml` publishes `web/`, with both
-Wasm builds and without the Python and test files, to Cloudflare Pages on every
-push to `main` that passes the `wasm` job. It then runs
-`bash scripts/check_site_headers.sh BASE_URL`, which fetches the page, its
-worker and the Wasm files and fails unless each carries the two headers above and
-the modules are served as `application/wasm`. The same command checks any
-served copy, such as `http://127.0.0.1:8000`.
-
-## Build and test
-
-Requires CMake 3.25 or later, Ninja and a C++20 compiler. Catch2 is fetched
-at configure time.
-
-    cmake --workflow --preset dev
-
-The `release` preset builds optimised, `asan` runs the suite under
-AddressSanitizer and UndefinedBehaviorSanitizer on Linux, and
-`msvc` builds with Visual Studio's compiler from a developer prompt.
-
-## Results
-
-`ForceConfig::thread_count` sets the threads, from 1 to 256. Results are
-bitwise identical for every thread count. Figures below are medians of 5
-repetitions on an Intel Core Ultra 5 238V (4 performance and 4 efficiency
-cores), g++ 16.2.0, `release` preset, Plummer sphere, softening 4/sqrt(N),
-theta 0.5, 8 threads. A tree evaluation includes building the tree.
-
-| N | direct (ms) | tree (ms) |
-|---:|---:|---:|
-| 4096 | 11.7 | 6.4 |
-| 16384 | 183.5 | 44.7 |
-| 32768 | 686.3 | 102.6 |
-| 65536 | 2739.0 | 253.4 |
-
-The tree at N = 65536 takes 896.8, 572.9, 395.4 and 253.4 ms on 1, 2, 4 and 8
-threads. The tree build is serial. The full data is in `results/`:
-`timing.json`, `force_error.csv` (force error quantiles against theta at
-N = 16384) and `energy_drift.csv` (relative energy error every 1/8 time unit
-for N = 4096 over 28.25 time units, about ten crossing times). The reference
-run, tree at theta 0.5, timestep 1/128 and softening 4/sqrt(N), drifts by at
-most 8.2e-5. Direct summation at the same settings drifts by at most 3.0e-6.
-
-Reproduce them from the repository root:
-
-    cmake --workflow --preset release
-    build/release/bench/nbody_bench --benchmark_repetitions=5 --benchmark_min_time=0.1s --benchmark_report_aggregates_only=true --benchmark_out=build/release/budget.json --benchmark_out_format=json
-    build/release/bench/accuracy_sweep force results/force_error.csv
-    build/release/bench/accuracy_sweep drift results/energy_drift.csv
-    python bench/check_budgets.py build/release/budget.json --drift results/energy_drift.csv --summary results/timing.json
-
-`check_budgets.py` prints each budget beside its figure and exits 1 when any
-is over. It reads the core count from `results/machine.txt`. Its tests run
-with `python -m unittest discover -s bench`. The drift sweep takes about
-eight minutes.
-
-The figures below come from those files:
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="results/speed-dark.png">
-  <img alt="Force evaluation time against N" src="results/speed.png">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="results/scaling-dark.png">
-  <img alt="Tree speedup over one thread" src="results/scaling.png">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="results/force_error-dark.png">
-  <img alt="Force error against the opening angle" src="results/force_error.png">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="results/energy_drift-dark.png">
-  <img alt="Energy error over time" src="results/energy_drift.png">
-</picture>
-
-The tree's energy error does not depend on the timestep: it is set by the
-opening angle, while direct summation's falls with the square of dt. Draw them
-again with `python scripts/plot_results.py`, which needs the `plot` extra.
-
-### Native against WebAssembly
-
-One tree force evaluation, tree build included, at N = 16384, theta 0.5,
-softening 4/sqrt(N). Medians of 5 repetitions, the native build from the
-`release` preset on the machine above and the Wasm builds under Node 26.4.0.
-
-| build | threads | native (ms) | WebAssembly (ms) | ratio |
-|:--|---:|---:|---:|---:|
-| `wasm-single` | 1 | 134.1 | 138.5 | 1.03 |
-| `wasm-threads` | 8 | 35.8 | 35.9 | 1.01 |
-
-The budgets are a ratio of at most 2.5 on one thread and 3 on eight. The two
-builds do not time the same particles: libc++ and libstdc++ draw different
-numbers from the same seed, so the Plummer sphere is a different realisation of
-the same distribution. Reproduce the figures after building the `release`,
-`wasm-single` and `wasm-threads` presets:
-
-    python bench/check_wasm_budgets.py --native build/release/bench/kernel_timing --wasm-single build/wasm-single/bench/kernel_timing.js --wasm-threads build/wasm-threads/bench/kernel_timing.js --summary results/wasm_timing.json
-
-It prints each ratio beside its budget and exits 1 when either is over. Its
-tests run with `python -m unittest discover -s bench`. The data is
-`results/wasm_timing.json`.
-
-## Checks
-
-    clang-tidy -quiet -p build/dev --extra-arg=--target=x86_64-w64-mingw32 src/*.cpp
-    cppcheck -q --std=c++20 --enable=warning,style,performance,portability,unusedFunction --suppress=useStlAlgorithm --error-exitcode=1 -I include src tests bench python wasm
-    clang-tidy -quiet wasm/bindings.cpp -- -std=c++20 --target=wasm32-unknown-emscripten -fwasm-exceptions -msimd128 -isystem $EMSDK/upstream/emscripten/cache/sysroot/include/c++/v1 -isystem $EMSDK/upstream/emscripten/cache/sysroot/include/compat -isystem $EMSDK/upstream/emscripten/cache/sysroot/include -Iinclude -DNBODY_WASM_MAX_THREADS=8 -D__EMSCRIPTEN__
-    ruff check python scripts web
-    mypy
-    vulture python scripts web --min-confidence 60
-    cmake --workflow --preset coverage
-    gcovr --root . --filter src/direct.cpp --filter src/octree.cpp --filter src/forces.cpp --filter src/simulation.cpp --filter src/diagnostics.cpp --exclude-throw-branches --exclude-unreachable-branches --exclude-noncode-lines --fail-under-line 100 --fail-under-branch 100 build/coverage
-
-The `--target` flag matters only for a MinGW toolchain, where clang-tidy
-must be told which one produced the compilation database.
+- [docs/building.md](docs/building.md): building, the Python and WebAssembly interfaces, serving the page, deployment and the checks.
+- [docs/reproducing.md](docs/reproducing.md): the commands behind every number and figure above.
 
 ## Licence
 
