@@ -230,6 +230,17 @@ public:
         });
     }
 
+    // Float64Array of three numbers: the total momentum, and the mass-weighted
+    // mean position.
+    [[nodiscard]] emscripten::val momentum() const {
+        const nbody::Vec3 total = nbody::total_momentum(simulation_.particles());
+        return array_of({total.x, total.y, total.z});
+    }
+    [[nodiscard]] emscripten::val centre_of_mass() const {
+        const nbody::Vec3 centre = nbody::centre_of_mass(simulation_.particles());
+        return array_of({centre.x, centre.y, centre.z});
+    }
+
     [[nodiscard]] std::size_t size() const { return simulation_.particles().size(); }
     [[nodiscard]] double time() const { return simulation_.time(); }
     [[nodiscard]] emscripten::val positions() const { return view_of(simulation_.particles().positions()); }
@@ -273,6 +284,8 @@ EMSCRIPTEN_BINDINGS(nbody) {
         .function("time", &Simulation::time)
         .function("positions", &Simulation::positions)
         .function("velocities", &Simulation::velocities)
+        .function("momentum", &Simulation::momentum)
+        .function("centreOfMass", &Simulation::centre_of_mass)
         .function("energy", &Simulation::energy)
         .function("initialEnergy", &Simulation::initial_energy);
 }

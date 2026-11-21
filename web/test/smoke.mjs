@@ -157,6 +157,15 @@ describe("both builds", () => {
       simulation.delete();
     });
 
+    it(`${name}: reports total momentum and centre of mass as three numbers near zero`, () => {
+      const simulation = plummer(module);
+      for (const vector of [simulation.momentum(), simulation.centreOfMass()]) {
+        assert.equal(vector.length, 3);
+        assert.ok([...vector].every((x) => Math.abs(x) < 1e-15), `${vector}`);
+      }
+      simulation.delete();
+    });
+
     it(`${name}: evaluates forces by either method for timing`, () => {
       const simulation = plummer(module);
       simulation.evaluateForces("direct");
