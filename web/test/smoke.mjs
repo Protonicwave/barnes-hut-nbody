@@ -15,6 +15,7 @@ import {
   labels,
   moduleState,
   particleCount,
+  wholeTreeShown,
   withChange,
 } from "../settings.js";
 import { readFileSync } from "node:fs";
@@ -301,6 +302,22 @@ describe("page controls reach the simulation with the value their label shows", 
     assert.equal(lastCall(module.calls, "create")[3], 2);
     assert.equal(labels(next).seed, "seed 2");
     runner.close();
+  });
+
+  it("the whole tree is drawn only for the tree on a non-Kepler setup with the toggle on", () => {
+    const tree = withChange(SMALL, "method", "tree");
+    assert.equal(wholeTreeShown(true, tree), true);
+    assert.equal(wholeTreeShown(false, tree), false);
+    assert.equal(wholeTreeShown(true, withChange(tree, "method", "direct")), false);
+    assert.equal(wholeTreeShown(true, withChange(tree, "setup", "kepler")), false);
+  });
+
+  it("the whole tree button is disabled under direct summation and hidden for Kepler", () => {
+    const tree = withChange(SMALL, "method", "tree");
+    assert.equal(controlState(tree).cellsDisabled, false);
+    assert.equal(controlState(withChange(tree, "method", "direct")).cellsDisabled, true);
+    assert.equal(controlState(tree).cellsHidden, false);
+    assert.equal(controlState(withChange(tree, "setup", "kepler")).cellsHidden, true);
   });
 
   it("the Kepler setup builds two bodies and disables N and softening", () => {

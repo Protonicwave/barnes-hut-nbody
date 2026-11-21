@@ -161,9 +161,10 @@ section[id] { scroll-margin-top: 72px; }
   background: var(--paper); color: var(--ink); cursor: pointer; font-size: 0.8125rem; font-weight: 500;
   display: inline-flex; align-items: center; gap: 8px;
 }
-.toggle::before { content: ""; width: 10px; height: 10px; border: 1.5px solid var(--tree); border-radius: 2px; }
-.toggle[aria-pressed="true"]::before { background: var(--tree); }
+.toggle::before { content: ""; width: 10px; height: 10px; border: 1.5px solid var(--ink-3); border-radius: 2px; }
+.toggle[aria-pressed="true"]::before { background: var(--ink-3); }
 .toggle:hover { background: var(--sunken); }
+.toggle:disabled { opacity: 0.45; cursor: not-allowed; background: var(--paper); }
 
 .overlay-state {
   position: absolute; inset: 0; display: none; place-content: center; justify-items: start; gap: 10px; padding: 24px;

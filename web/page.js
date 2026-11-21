@@ -10,6 +10,7 @@ import {
   initialSettings,
   labels,
   moduleState,
+  wholeTreeShown,
   withChange,
 } from "./settings.js";
 import { runRecord } from "./record.js";
@@ -114,6 +115,7 @@ function syncControls() {
   }
   $$('input[name="speed"]').forEach((radio) => (radio.disabled = module.controlsDisabled));
   $("#cellsToggle").hidden = controls.cellsHidden;
+  $("#cellsToggle").disabled = controls.cellsDisabled;
   $("#cellsToggle").setAttribute("aria-pressed", String(view.showCells));
   setText("#playBtn", view.running ? "Pause" : "Play");
   setText("#seedNote", text.seed);
@@ -254,7 +256,7 @@ function draw(stepped = false) {
     probe: latest?.probe,
     cells,
     trails,
-    showCells: view.showCells && settings.method === "tree",
+    showCells: wholeTreeShown(view.showCells, settings),
   });
 }
 
@@ -389,7 +391,7 @@ function requestFrames() {
     type: "frame",
     steps: view.running ? view.speed : 0,
     probe: markedParticle(),
-    wantCells: view.showCells && settings.method === "tree",
+    wantCells: wholeTreeShown(view.showCells, settings),
     resendCells: cells === null,
   });
 }

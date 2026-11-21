@@ -102,7 +102,14 @@ export function controlState(settings) {
     thetaDisabled: direct,
     thetaWarning: !direct && settings.theta > THETA_WARNING_ABOVE,
     cellsHidden: kepler,
+    cellsDisabled: direct,
   };
+}
+
+// Whether the octree cells are drawn and requested: only the tree has cells,
+// and the Kepler setup has no view of them.
+export function wholeTreeShown(showCells, settings) {
+  return showCells && settings.method === "tree" && settings.setup !== "kepler";
 }
 
 // What the page shows for the state of the WebAssembly module: "loading",
