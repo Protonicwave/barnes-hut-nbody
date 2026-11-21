@@ -386,6 +386,7 @@ describe("the run record", () => {
     "import numpy as np",
     "import barnes_hut as bh",
     "",
+    "# same seed; the starting particles can differ from this tab by platform",
     "positions, velocities, masses = bh.plummer_sphere(1024, seed=1)",
     "simulation = bh.Simulation(",
     "    positions, velocities, masses,",
@@ -414,7 +415,7 @@ describe("the run record", () => {
     const record = runRecord({ ...DEFAULT_SETTINGS, setup: "kepler" }, 0.5, null);
     assert.match(record, /bh\.kepler_binary\(eccentricity=0\.5, semi_major_axis=1\.0\)/);
     assert.match(record, /softening=0,/);
-    assert.doesNotMatch(record, /seed|sqrt/);
+    assert.doesNotMatch(record, /seed|sqrt|platform/);
   });
 
   it("notes a method or theta change only when the force was changed", () => {

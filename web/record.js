@@ -6,11 +6,17 @@ import { TIMESTEP_LABELS, particleCount, timestep } from "./settings.js";
 const KEPLER_CALL = "bh.kepler_binary(eccentricity=0.5, semi_major_axis=1.0)";
 const SETUP_FUNCTIONS = { plummer: "plummer_sphere", collapse: "uniform_sphere" };
 
-function setupCall(settings) {
+// The random setups use the seed on screen, but the Python build need not draw
+// the same particles as this tab: the C++ draws two random values in one
+// expression, and compilers order those differently.
+const SEEDED_NOTE = "# same seed; the starting particles can differ from this tab by platform";
+
+function setupLines(settings) {
   if (settings.setup === "kepler") {
-    return KEPLER_CALL;
+    return [`positions, velocities, masses = ${KEPLER_CALL}`];
   }
-  return `bh.${SETUP_FUNCTIONS[settings.setup]}(${particleCount(settings)}, seed=${settings.seed})`;
+  const call = `bh.${SETUP_FUNCTIONS[settings.setup]}(${particleCount(settings)}, seed=${settings.seed})`;
+  return [SEEDED_NOTE, `positions, velocities, masses = ${call}`];
 }
 
 const softeningText = (settings) =>
@@ -29,7 +35,7 @@ export function runRecord(settings, time, forceChangedAt) {
     "import numpy as np",
     "import barnes_hut as bh",
     "",
-    `positions, velocities, masses = ${setupCall(settings)}`,
+    ...setupLines(settings),
     "simulation = bh.Simulation(",
     "    positions, velocities, masses,",
     `    dt=${TIMESTEP_LABELS[settings.timestepIndex].replace("/", " / ")}, softening=${softeningText(settings)},`,
