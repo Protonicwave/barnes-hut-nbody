@@ -34,7 +34,9 @@ def relative_targets(text: str) -> list[str]:
 
 def broken_targets(directory: Path, text: str) -> list[str]:
     """Relative link, src and srcset targets in the text that name no file under the directory."""
-    return [path for path in relative_targets(text) if not (directory / path).exists()]
+    return [
+        path for path in relative_targets(text) if not (directory / path.split("#")[0]).exists()
+    ]
 
 
 def fragile_maths(text: str) -> list[str]:
@@ -100,6 +102,11 @@ def test_package_description_has_no_maths_or_relative_targets() -> None:
 def test_relative_targets_are_listed() -> None:
     text = "[a](x.md) ![b](y.png) [c](https://example.com) [d](#top)\n```\n[e](z.md)\n```\n"
     assert relative_targets(text) == ["x.md", "y.png"]
+
+
+def test_target_with_a_fragment_resolves_to_its_file(tmp_path: Path) -> None:
+    (tmp_path / "there.md").write_bytes(b"")
+    assert broken_targets(tmp_path, "[a](there.md#part) [b](gone.md#part)") == ["gone.md#part"]
 
 
 def test_missing_target_is_reported(tmp_path: Path) -> None:
