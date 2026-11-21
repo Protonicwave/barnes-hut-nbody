@@ -24,17 +24,17 @@ def prose(text: str) -> str:
     return INDENTED_CODE.sub("", FENCE.sub("", text))
 
 
-def broken_targets(directory: Path, text: str) -> list[str]:
-    """Relative link, src and srcset targets in the text that name no file under the directory."""
+def relative_targets(text: str) -> list[str]:
+    """Relative link, src and srcset targets in the text, outside code."""
     markup = prose(text)
     targets = LINK_TARGET.findall(markup) + ATTRIBUTE_TARGET.findall(markup)
-    missing = []
-    for target in targets:
-        for candidate in target.split(","):
-            path = candidate.split()[0] if candidate.split() else ""
-            if path and not path.startswith(EXTERNAL) and not (directory / path).exists():
-                missing.append(path)
-    return missing
+    paths = [part.split()[0] for target in targets for part in target.split(",") if part.split()]
+    return [path for path in paths if not path.startswith(EXTERNAL)]
+
+
+def broken_targets(directory: Path, text: str) -> list[str]:
+    """Relative link, src and srcset targets in the text that name no file under the directory."""
+    return [path for path in relative_targets(text) if not (directory / path).exists()]
 
 
 def fragile_maths(text: str) -> list[str]:
@@ -89,6 +89,17 @@ def test_readme_table_matches_timing_results() -> None:
     text = (ROOT / "README.md").read_text(encoding="utf-8")
     timing = json.loads((ROOT / "results" / "timing.json").read_text(encoding="utf-8"))
     assert table_errors(results_table(text), timing) == []
+
+
+def test_package_description_has_no_maths_or_relative_targets() -> None:
+    text = (ROOT / "docs" / "pypi.md").read_text(encoding="utf-8")
+    assert relative_targets(text) == []
+    assert "$" not in text
+
+
+def test_relative_targets_are_listed() -> None:
+    text = "[a](x.md) ![b](y.png) [c](https://example.com) [d](#top)\n```\n[e](z.md)\n```\n"
+    assert relative_targets(text) == ["x.md", "y.png"]
 
 
 def test_missing_target_is_reported(tmp_path: Path) -> None:
