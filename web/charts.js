@@ -106,13 +106,11 @@ function plot(svg, config) {
       `<rect class="band-hatch" fill="url(#hatch-${svg.id})" x="${x(from)}" y="${m.top}" width="${x(to) - x(from)}" height="${plotHeight}"/>` +
       `<text class="t-soft" x="${x(from) + 6}" y="${m.top + plotHeight - 8}">${config.zoneLabel}</text>`;
   }
-  for (const axis of [config.x, config.y]) {
-    axis.minor = axis.log ? logMinorTicks(axis) : [];
-  }
-  for (const value of config.y.minor) {
+  const minor = (axis) => (axis.log ? logMinorTicks(axis) : []);
+  for (const value of minor(config.y)) {
     markup += `<line class="minor" x1="${m.left}" x2="${m.left + 4}" y1="${y(value)}" y2="${y(value)}"/>`;
   }
-  for (const value of config.x.minor) {
+  for (const value of minor(config.x)) {
     markup += `<line class="minor" x1="${x(value)}" x2="${x(value)}" y1="${m.top + plotHeight}" y2="${m.top + plotHeight - 4}"/>`;
   }
   for (const tick of config.y.ticks) {
@@ -242,7 +240,6 @@ function drawSpeed(data) {
       { lineClass: "l-tree", textClass: "t-tree", label: "tree", points: tree },
     ],
   });
-  document.getElementById("capTime").textContent = figureCaptions(data).time;
 }
 
 function drawThreads(data) {
@@ -260,7 +257,6 @@ function drawThreads(data) {
       { lineClass: "l-tree", textClass: "t-tree", label: "tree", dots: true, dotClass: "dot-tree", points: speedups },
     ],
   });
-  document.getElementById("capThreads").textContent = figureCaptions(data).threads;
 }
 
 function wasmRatio(runs, platform, threads) {
@@ -269,7 +265,7 @@ function wasmRatio(runs, platform, threads) {
 }
 
 function fillWasmTable(data) {
-  const { runs, count, node } = data.wasm;
+  const { runs } = data.wasm;
   const rows = [
     ["Native, 1 thread", "native", 1],
     ["WebAssembly, 1 thread", "wasm-single", 1],
@@ -282,7 +278,6 @@ function fillWasmTable(data) {
     return `<tr><td>${label}</td><td class="n" data-label="Time">${formatMilliseconds(ms)}</td>` +
       `<td class="n" data-label="Ratio">${(ms / native).toFixed(2)}×</td></tr>`;
   }).join("");
-  document.getElementById("capWasm").textContent = figureCaptions(data).wasm;
 }
 
 // Exponent k of the power law m = a * theta^k through the first and last angle.
@@ -305,7 +300,6 @@ function drawForceError(data) {
       { lineClass: "l-tree", textClass: "t-tree", label: "median", points: rows.map((row) => [row.theta, row.median]) },
     ],
   });
-  document.getElementById("capForce").textContent = figureCaptions(data).force;
 }
 
 const driftLabel = (curve) => (curve.method === "direct" ? "direct" : `θ = ${curve.theta}`);
@@ -313,7 +307,7 @@ const driftClasses = (curve) =>
   curve.method === "direct" ? ["l-direct", "t-direct"] : curve.theta === 0.5 ? ["l-tree", "t-tree"] : ["l-tree-soft", "t-soft"];
 
 function drawDrift(data) {
-  const { curves, count, timestep } = data.drift;
+  const { curves } = data.drift;
   const positive = curves.flatMap((curve) => curve.points.filter(([, e]) => e > 0));
   const decades = positive.map(([, e]) => Math.log10(e));
   const lowDecade = Math.floor(Math.min(...decades));
@@ -330,7 +324,6 @@ function drawDrift(data) {
       return { lineClass, textClass, label: driftLabel(curve), points: curve.points.filter(([, e]) => e > 0) };
     }),
   });
-  document.getElementById("capDrift").textContent = figureCaptions(data).drift;
 }
 
 const maxDrift = (data, method, theta) =>
@@ -370,6 +363,10 @@ function fillBudgets(data) {
 
 // Draws every figure and fills every table and caption in the results section.
 export function drawFigures(data) {
+  const captions = figureCaptions(data);
+  for (const [name, text] of Object.entries(captions)) {
+    document.getElementById(`cap${name[0].toUpperCase()}${name.slice(1)}`).textContent = text;
+  }
   drawSpeed(data);
   drawThreads(data);
   fillWasmTable(data);
