@@ -70,6 +70,20 @@ export function drawEnergy(svg, samples, time, method) {
   svg.innerHTML = markup;
 }
 
+// The marks at 2 to 9 times each power of ten inside a log axis.
+function logMinorTicks(axis) {
+  const marks = [];
+  for (let decade = Math.floor(Math.log10(axis.min)); decade < Math.log10(axis.max); decade++) {
+    for (let multiple = 2; multiple < 10; multiple++) {
+      const value = multiple * 10 ** decade;
+      if (value > axis.min && value < axis.max) {
+        marks.push(value);
+      }
+    }
+  }
+  return marks;
+}
+
 // A line chart with optional log axes, reference lines, a shaded zone and
 // end labels, which are moved apart where they would overlap.
 function plot(svg, config) {
@@ -87,8 +101,19 @@ function plot(svg, config) {
   let markup = "";
   if (config.zone) {
     const [from, to] = config.zone;
-    markup += `<rect class="band-zone" x="${x(from)}" y="${m.top}" width="${x(to) - x(from)}" height="${plotHeight}"/>` +
+    markup += `<defs><pattern id="hatch-${svg.id}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="hatch" x1="0" y1="0" x2="0" y2="6"/></pattern></defs>` +
+      `<rect class="band-zone" x="${x(from)}" y="${m.top}" width="${x(to) - x(from)}" height="${plotHeight}"/>` +
+      `<rect class="band-hatch" fill="url(#hatch-${svg.id})" x="${x(from)}" y="${m.top}" width="${x(to) - x(from)}" height="${plotHeight}"/>` +
       `<text class="t-soft" x="${x(from) + 6}" y="${m.top + plotHeight - 8}">${config.zoneLabel}</text>`;
+  }
+  for (const axis of [config.x, config.y]) {
+    axis.minor = axis.log ? logMinorTicks(axis) : [];
+  }
+  for (const value of config.y.minor) {
+    markup += `<line class="minor" x1="${m.left}" x2="${m.left + 4}" y1="${y(value)}" y2="${y(value)}"/>`;
+  }
+  for (const value of config.x.minor) {
+    markup += `<line class="minor" x1="${x(value)}" x2="${x(value)}" y1="${m.top + plotHeight}" y2="${m.top + plotHeight - 4}"/>`;
   }
   for (const tick of config.y.ticks) {
     markup += `<line class="grid" x1="${m.left}" x2="${width - m.right}" y1="${y(tick)}" y2="${y(tick)}"/>` +
@@ -163,6 +188,45 @@ const crossoverSentence = (count) =>
     ? "The tree does not overtake direct summation at any count measured, and is"
     : `The tree overtakes direct summation at N = ${formatInteger(count)} and is`;
 
+const threadsText = (threads) => `${threads} ${threads === 1 ? "thread" : "threads"}`;
+
+// The caption of each plate, built only from what results.json holds. The
+// speed and thread plates name the machine, since their numbers depend on it;
+// the accuracy plates do not, since accuracy does not.
+export function figureCaptions(data) {
+  const rows = data.timing;
+  const { cpu, physicalCores: cores } = data.machine;
+  const machine = `${cpu}, ${cores} physical cores`;
+  const efficiency = data.budgets.timing.min_scaling_efficiency;
+  const treeMs = findTiming(rows, "tree", REFERENCE_COUNT, REFERENCE_THREADS);
+  const speedup = findTiming(rows, "direct", REFERENCE_COUNT, REFERENCE_THREADS) / treeMs;
+  const single = findTiming(rows, "tree", REFERENCE_COUNT, 1);
+  const measured = single / findTiming(rows, "tree", REFERENCE_COUNT, REFERENCE_THREADS);
+  const force = data.forceError.rows;
+  const { curves, count: driftCount, timestep } = data.drift;
+  const endTime = Math.max(...curves.flatMap((curve) => curve.points.map(([t]) => t)));
+  const thetas = curves.filter((curve) => curve.method === "tree").map((curve) => curve.theta);
+  return {
+    time:
+      `Direct summation grows as N², the tree as N log N. ${crossoverSentence(crossoverCount(rows))} ` +
+      `${speedup.toFixed(1)} times faster at N = ${formatInteger(REFERENCE_COUNT)}, where one evaluation takes ${treeMs.toFixed(0)} ms. ` +
+      `Both series use ${threadsText(REFERENCE_THREADS)} on ${machine}.`,
+    threads:
+      `One tree evaluation at N = ${formatInteger(REFERENCE_COUNT)}, against its own time on one thread, for ${THREAD_COUNTS.join(", ")} threads on ${machine}. ` +
+      `${threadsText(REFERENCE_THREADS)} give ${measured.toFixed(1)} times, ` +
+      `${measured >= efficiency * cores ? "above" : "below"} the ${efficiency} P limit of ${(efficiency * cores).toFixed(1)}.`,
+    wasm:
+      `Same kernel, N = ${formatInteger(data.wasm.count)}, θ = 0.5, timed under Node ${data.wasm.node.replace(/^v/, "")} on ${machine}, ` +
+      `with ${threadsText(1)} and ${threadsText(REFERENCE_THREADS)}. The two builds draw different realisations of the same Plummer sphere.`,
+    force:
+      `Relative error of the tree force against direct summation, N = ${formatInteger(data.forceError.count)}, ε = 4/√N. ` +
+      `Between θ = ${force[0].theta} and θ = ${force.at(-1).theta} the median error grows roughly as θ to the power ${fittedExponent(force, "median").toFixed(1)}.`,
+    drift:
+      `N = ${formatInteger(driftCount)}, Δt = 1/${Math.round(1 / timestep)}, ε = 4/√N, ${formatInteger(endTime / timestep)} steps, tree at θ = 0.3 to 1. ` +
+      "Direct summation at the same step shows integration error alone. The gap above it is the tree.",
+  };
+}
+
 function drawSpeed(data) {
   const rows = data.timing;
   const direct = timingSeries(rows, "direct", "count", { threads: REFERENCE_THREADS });
@@ -178,12 +242,7 @@ function drawSpeed(data) {
       { lineClass: "l-tree", textClass: "t-tree", label: "tree", points: tree },
     ],
   });
-  const speedup = findTiming(rows, "direct", REFERENCE_COUNT, REFERENCE_THREADS) / findTiming(rows, "tree", REFERENCE_COUNT, REFERENCE_THREADS);
-  const treeMs = findTiming(rows, "tree", REFERENCE_COUNT, REFERENCE_THREADS);
-  document.getElementById("capTime").textContent =
-    `Direct summation grows as N², the tree as N log N. ${crossoverSentence(crossoverCount(rows))} ` +
-    `${speedup.toFixed(1)} times faster at N = ${formatInteger(REFERENCE_COUNT)}, where one evaluation takes ${treeMs.toFixed(0)} ms. ` +
-    "Median of five repetitions.";
+  document.getElementById("capTime").textContent = figureCaptions(data).time;
 }
 
 function drawThreads(data) {
@@ -201,11 +260,7 @@ function drawThreads(data) {
       { lineClass: "l-tree", textClass: "t-tree", label: "tree", dots: true, dotClass: "dot-tree", points: speedups },
     ],
   });
-  const cores = data.machine.physicalCores;
-  const measured = speedups.at(-1)[1];
-  document.getElementById("capThreads").textContent =
-    `One tree evaluation at N = ${formatInteger(REFERENCE_COUNT)}, against its own time on one thread. Eight threads give ${measured.toFixed(1)} times, ` +
-    `${measured >= efficiency * cores ? "above" : "below"} the ${efficiency} P limit of ${(efficiency * cores).toFixed(1)} on this ${cores}-core machine.`;
+  document.getElementById("capThreads").textContent = figureCaptions(data).threads;
 }
 
 function wasmRatio(runs, platform, threads) {
@@ -227,8 +282,7 @@ function fillWasmTable(data) {
     return `<tr><td>${label}</td><td class="n" data-label="Time">${formatMilliseconds(ms)}</td>` +
       `<td class="n" data-label="Ratio">${(ms / native).toFixed(2)}×</td></tr>`;
   }).join("");
-  document.getElementById("capWasm").textContent =
-    `Same kernel, N = ${formatInteger(count)}, θ = 0.5, timed under Node ${node.replace(/^v/, "")}. The two builds draw different realisations of the same Plummer sphere.`;
+  document.getElementById("capWasm").textContent = figureCaptions(data).wasm;
 }
 
 // Exponent k of the power law m = a * theta^k through the first and last angle.
@@ -251,9 +305,7 @@ function drawForceError(data) {
       { lineClass: "l-tree", textClass: "t-tree", label: "median", points: rows.map((row) => [row.theta, row.median]) },
     ],
   });
-  document.getElementById("capForce").textContent =
-    `Relative error of the tree force against direct summation, N = ${formatInteger(data.forceError.count)}, ε = 4/√N. ` +
-    `Between θ = ${rows[0].theta} and θ = ${rows.at(-1).theta} the median error grows roughly as θ to the power ${fittedExponent(rows, "median").toFixed(1)}.`;
+  document.getElementById("capForce").textContent = figureCaptions(data).force;
 }
 
 const driftLabel = (curve) => (curve.method === "direct" ? "direct" : `θ = ${curve.theta}`);
@@ -278,9 +330,7 @@ function drawDrift(data) {
       return { lineClass, textClass, label: driftLabel(curve), points: curve.points.filter(([, e]) => e > 0) };
     }),
   });
-  document.getElementById("capDrift").textContent =
-    `N = ${formatInteger(count)}, Δt = 1/${Math.round(1 / timestep)}, ε = 4/√N, ${formatInteger(endTime / timestep)} steps. ` +
-    "Direct summation at the same step shows integration error alone. The gap above it is the tree.";
+  document.getElementById("capDrift").textContent = figureCaptions(data).drift;
 }
 
 const maxDrift = (data, method, theta) =>

@@ -219,17 +219,17 @@
       </div>
       <div class="plates wide-first">
         <figure class="plate" style="margin:0">
-          <header><h4>Time per force evaluation</h4></header>
+          <header><span class="fig-no">Fig. 2</span><h4>Time per force evaluation</h4></header>
           <svg class="chart" id="figTime" role="img" aria-label="Time per force evaluation against particle count, direct and tree, both on log axes"></svg>
           <figcaption id="capTime"></figcaption>
         </figure>
         <figure class="plate" style="margin:0">
-          <header><h4>Scaling with threads</h4></header>
+          <header><span class="fig-no">Fig. 3</span><h4>Scaling with threads</h4></header>
           <svg class="chart" id="figThreads" role="img" aria-label="Speedup of the tree force evaluation against thread count"></svg>
           <figcaption id="capThreads"></figcaption>
         </figure>
         <figure class="plate" style="margin:0">
-          <header><h4>Native and WebAssembly</h4></header>
+          <header><span class="fig-no">Table 1</span><h4>Native and WebAssembly</h4></header>
           <div class="table-scroll">
             <table class="budget" style="margin-top:-4px">
               <thead><tr><th>Build</th><th>One tree evaluation</th><th>Against native</th></tr></thead>
@@ -248,12 +248,12 @@
       </div>
       <div class="plates">
         <figure class="plate" style="margin:0">
-          <header><h4>Force error against θ</h4></header>
+          <header><span class="fig-no">Fig. 4</span><h4>Force error against θ</h4></header>
           <svg class="chart" id="figForce" role="img" aria-label="Median and 99th percentile relative force error against opening angle, log scale"></svg>
           <figcaption id="capForce"></figcaption>
         </figure>
         <figure class="plate" style="margin:0">
-          <header><h4>Energy drift over ten crossing times</h4></header>
+          <header><span class="fig-no">Fig. 5</span><h4>Energy drift over ten crossing times</h4></header>
           <svg class="chart" id="figDrift" role="img" aria-label="Relative energy error against time for direct summation and the tree at four opening angles"></svg>
           <figcaption id="capDrift"></figcaption>
         </figure>
@@ -266,6 +266,7 @@
         <p>Each limit is a number written down before the measurement, and a script exits non-zero when any is exceeded.</p>
       </div>
       <div class="table-scroll">
+        <p class="fig-no">Table 2</p>
         <table class="budget">
           <thead><tr><th>Budget</th><th>Limit</th><th>Measured</th><th>Status</th></tr></thead>
           <tbody id="budgetRows"></tbody>

@@ -17,7 +17,8 @@ import {
   particleCount,
   withChange,
 } from "../settings.js";
-import { decadeFraction } from "../charts.js";
+import { readFileSync } from "node:fs";
+import { decadeFraction, figureCaptions } from "../charts.js";
 import { runRecord } from "../record.js";
 import { defaultMarkedParticle, openedLeaves, openingTest, walkCounts } from "../scope.js";
 import createThreaded from "../wasm/threads/nbody.js";
@@ -434,6 +435,25 @@ describe("decadeFraction", () => {
     assert.equal(decadeFraction(0, -6, -1), 0);
     assert.equal(decadeFraction(1e-9, -6, -1), 0);
     assert.equal(decadeFraction(1, -6, -1), 1);
+  });
+});
+
+describe("figureCaptions", () => {
+  const results = JSON.parse(readFileSync(new URL("../data/results.json", import.meta.url), "utf8"));
+  const captions = figureCaptions({ ...results, machine: { ...results.machine, cpu: "Test CPU" } });
+
+  it("names the machine and the thread count on the speed and scaling plates and the table", () => {
+    for (const text of [captions.time, captions.threads, captions.wasm]) {
+      assert.ok(text.includes("Test CPU"), text);
+      assert.ok(text.includes("8 threads"), text);
+    }
+  });
+
+  it("gives the count of the force plate and states no repetition count", () => {
+    assert.ok(captions.force.includes("N = 16,384"), captions.force);
+    assert.ok(captions.drift.includes("N = 4,096"), captions.drift);
+    assert.ok(captions.drift.includes("Δt = 1/128"), captions.drift);
+    assert.ok(!Object.values(captions).some((text) => text.includes("repetitions")));
   });
 });
 

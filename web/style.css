@@ -297,6 +297,9 @@ select {
 .chart .dot-tree { stroke: var(--tree); }
 .chart .dot-direct { stroke: var(--direct); }
 .chart .band-zone { fill: var(--tree-wash); }
+.chart .hatch { stroke: var(--tree-soft); stroke-width: 1; opacity: 0.45; }
+.chart .minor { stroke: var(--rule-strong); stroke-width: 1; }
+.fig-no { font: 600 0.75rem var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
 .chart .mark { fill: none; stroke: var(--ink-2); stroke-width: 1.5; }
 
 .budget { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
