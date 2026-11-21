@@ -12,6 +12,7 @@ import {
   softening,
   timestep,
 } from "./settings.js";
+import { openedLeaves, openingTest } from "./scope.js";
 
 // Deepest octree level drawn, and steps between recomputing the cells: the
 // tree moves slowly, and building it again costs about one force evaluation.
@@ -167,16 +168,24 @@ export class Runner {
     return this.#simulation.treeCells(OVERLAY_DEPTH);
   }
 
+  // The tree walk of one particle, with the opening test of its largest
+  // accepted cell. Null when there is no tree to walk: a binary, or direct
+  // summation.
   #probe(index, count) {
-    if (!(index >= 0 && index < count) || this.#settings.setup === "kepler") {
+    const { setup, method, theta } = this.#settings;
+    if (!(index >= 0 && index < count) || setup === "kepler" || method === "direct") {
       return null;
     }
     const trace = this.#simulation.walkTrace(index);
+    const position = this.#simulation.positions().slice(3 * index, 3 * index + 3);
     return {
       index,
       interactions: trace.interactions,
       accepted: trace.accepted,
+      acceptedCentresOfMass: trace.acceptedCentresOfMass,
       opened: trace.opened,
+      openedLeaves: openedLeaves(trace.opened, trace.accepted),
+      test: openingTest(trace.accepted, trace.acceptedCentresOfMass, position, theta),
     };
   }
 
@@ -216,7 +225,11 @@ function transferables(message) {
     buffers.push(message.cells.buffer);
   }
   if (message.probe) {
-    buffers.push(message.probe.accepted.buffer, message.probe.opened.buffer);
+    buffers.push(
+      message.probe.accepted.buffer,
+      message.probe.acceptedCentresOfMass.buffer,
+      message.probe.opened.buffer,
+      message.probe.openedLeaves.buffer);
   }
   return buffers;
 }

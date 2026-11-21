@@ -10,12 +10,14 @@ import {
   PARTICLE_COUNTS,
   SOFTENING_SCALES,
   TIMESTEP_LABELS,
+  VIEW_RADIUS,
   controlState,
   labels,
   moduleState,
   particleCount,
   withChange,
 } from "../settings.js";
+import { defaultMarkedParticle, openedLeaves, openingTest, walkCounts } from "../scope.js";
 import createThreaded from "../wasm/threads/nbody.js";
 import createSingle from "../wasm/single/nbody.js";
 
@@ -393,6 +395,111 @@ describe("frames", () => {
     const message = runner.frame({ steps: 16, budgetMs: 12, probe: -1, wantCells: false }).message;
     assert.ok(message.time < 16 / 128);
     assert.ok(message.time > 0);
+    runner.close();
+  });
+});
+
+describe("the scope's claims about one particle's walk", () => {
+  const TRACED = 3;
+  const traced = (settings = SMALL) => {
+    const runner = new Runner(single, settings);
+    return { runner, message: frame(runner, { steps: 0, probe: TRACED }) };
+  };
+  const independentWalk = () => {
+    const simulation = single.Simulation.create("plummer", 256, SMALL.seed, "tree", SMALL.theta, 4 / Math.sqrt(256), DT, 1);
+    const trace = simulation.walkTrace(TRACED);
+    const position = simulation.positions().slice(3 * TRACED, 3 * TRACED + 3);
+    simulation.delete();
+    return { trace, position };
+  };
+
+  it("the probe's opening test is s / (d - delta) for the accepted cell with the largest edge, below theta", () => {
+    const { runner, message } = traced();
+    const { test } = message.probe;
+    const { trace, position } = independentWalk();
+    const edges = Array.from({ length: trace.accepted.length / 5 }, (_, cell) => trace.accepted[5 * cell + 3]);
+    const mass = trace.acceptedCentresOfMass.slice(3 * test.cell, 3 * test.cell + 3);
+    const centre = trace.accepted.slice(5 * test.cell, 5 * test.cell + 3);
+    const distance = Math.hypot(...position.map((x, axis) => x - mass[axis]));
+    const offset = Math.hypot(...mass.map((x, axis) => x - centre[axis]));
+    assert.equal(test.edge, Math.max(...edges));
+    assert.ok(Math.abs(test.ratio - test.edge / (distance - offset)) < 1e-12);
+    assert.ok(test.ratio < SMALL.theta);
+    assert.equal(test.theta, SMALL.theta);
+    runner.close();
+  });
+
+  it("the probe is absent under direct summation, where there is no walk to show", () => {
+    const runner = new Runner(single, SMALL);
+    runner.change({ ...SMALL, method: "direct" });
+    assert.equal(frame(runner, { steps: 0, probe: TRACED }).probe, null);
+    runner.close();
+  });
+
+  it("opening test picks the largest edge, then the nearest, and is null with no accepted cell", () => {
+    const centres = new Float64Array([0, 0, 0, 4, 0, 0, 1, 0, 0, 0, 0, 0]);
+    const accepted = new Float64Array([0, 0, 0, 1, 3, 0, 0, 0, 2, 2, 1, 0, 0, 2, 2, 0, 0, 0, 1, 3]);
+    const test = openingTest(accepted, centres, [0, 0, 0], 0.5);
+    assert.equal(test.cell, 2);
+    assert.equal(test.edge, 2);
+    assert.equal(test.distance, 1);
+    assert.equal(test.offset, 0);
+    assert.equal(test.ratio, 2);
+    assert.equal(openingTest(new Float64Array(0), new Float64Array(0), [0, 0, 0], 0.5), null);
+  });
+
+  it("walk counts add up to the interactions, give N - 1 for direct and nothing for a binary", () => {
+    const { runner, message } = traced();
+    const counts = walkCounts(message.probe, message.count, "plummer", "tree");
+    assert.equal(counts.cells + counts.particles, message.probe.interactions);
+    assert.equal(counts.cells, message.probe.accepted.length / 5);
+    assert.deepEqual(walkCounts(null, 256, "plummer", "direct"), { cells: 0, particles: 255 });
+    assert.equal(walkCounts(null, 256, "plummer", "tree"), null);
+    assert.equal(walkCounts(null, 2, "kepler", "tree"), null);
+    assert.equal(walkCounts(null, 2, "kepler", "direct"), null);
+    runner.close();
+  });
+
+  it("the default mark is the particle nearest the aim point, and absent for a binary or no positions", () => {
+    for (const setup of ["plummer", "collapse"]) {
+      const runner = new Runner(single, { ...SMALL, setup });
+      const { positions } = frame(runner, { steps: 0 });
+      const aim = [0.5 * VIEW_RADIUS[setup], -0.25 * VIEW_RADIUS[setup]];
+      const distances = Array.from({ length: positions.length / 2 }, (_, i) =>
+        Math.hypot(positions[2 * i] - aim[0], positions[2 * i + 1] - aim[1]));
+      assert.equal(defaultMarkedParticle(positions, setup), distances.indexOf(Math.min(...distances)));
+      runner.close();
+    }
+    assert.equal(defaultMarkedParticle(new Float32Array([0, 0, 1, 1]), "kepler"), -1);
+    assert.equal(defaultMarkedParticle(undefined, "plummer"), -1);
+    assert.equal(defaultMarkedParticle(new Float32Array(0), "plummer"), -1);
+  });
+
+  it("a leaf is an opened cell with no visited child, and the root is not one", () => {
+    const { runner, message } = traced({ ...SMALL, countIndex: 2 });
+    const { opened, accepted, openedLeaves: leaves } = message.probe;
+    assert.equal(leaves.length, opened.length / 5);
+    assert.equal(opened[4], 0);
+    assert.equal(leaves[0], 0);
+    const children = (first) => {
+      const half = opened[first + 3] / 2;
+      const inside = (cells, k) => cells[k + 4] === opened[first + 4] + 1 &&
+        [0, 1, 2].every((axis) => Math.abs(cells[k + axis] - opened[first + axis]) < half);
+      let found = 0;
+      for (const cells of [opened, accepted]) {
+        for (let k = 0; k < cells.length; k += 5) {
+          found += inside(cells, k) ? 1 : 0;
+        }
+      }
+      return found;
+    };
+    let leafCount = 0;
+    for (let cell = 0; cell < leaves.length; cell++) {
+      assert.equal(leaves[cell] === 1, children(5 * cell) === 0, `cell ${cell}`);
+      leafCount += leaves[cell];
+    }
+    assert.ok(leafCount > 0);
+    assert.equal(openedLeaves(new Float64Array(0), new Float64Array(0)).length, 0);
     runner.close();
   });
 });

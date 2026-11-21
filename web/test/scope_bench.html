@@ -4,19 +4,23 @@
 <meta charset="utf-8">
 <title>Scope draw time</title>
 <style>
-  :root { --view-bg: #0c1018; --view-ink: #e8eaf0; --view-dim: #9aa1b0; --view-rule: #2a3040; --view-tree: #e8b04a; }
+  :root {
+    --view-bg: oklch(0.15 0.03 262); --view-ink: oklch(0.93 0.015 250); --view-dim: oklch(0.7 0.02 255);
+    --view-grid: oklch(0.3 0.04 262); --view-axis: oklch(0.46 0.04 262); --view-tree: oklch(0.8 0.14 78);
+  }
   body { margin: 0; background: #fff; }
   #glass { position: relative; width: 960px; height: 660px; background: var(--view-bg); }
   #glass canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 </style>
 </head>
 <body>
-<div id="glass"><canvas id="view"></canvas></div>
+<div id="glass"><canvas id="graticule"></canvas><canvas id="particles"></canvas><canvas id="view"></canvas></div>
 <script type="module">
 // Draws one 8,192 particle Plummer frame from the single-threaded build many
 // times and reports the median time of one Viewport.draw. page_budget.mjs
 // reads window.benchResult.
 import { Runner } from "../runner.js";
+import { defaultMarkedParticle } from "../scope.js";
 import { DEFAULT_SETTINGS } from "../settings.js";
 import { Viewport } from "../viewport.js";
 import createModule from "../wasm/single/nbody.js";
@@ -25,24 +29,28 @@ const DRAWS = 200;
 const WARM_UP_DRAWS = 20;
 const LARGEST_COUNT_INDEX = 5;
 const SETTLE_STEPS = 8;
-const PROBE_INDEX = 0;
-
 (async () => {
   const module = await createModule();
   const settings = { ...DEFAULT_SETTINGS, countIndex: LARGEST_COUNT_INDEX, threads: 1 };
   const runner = new Runner(module, settings);
-  const { message } = runner.frame({ steps: SETTLE_STEPS, budgetMs: 10000, probe: PROBE_INDEX, wantCells: true });
+  const first = runner.frame({ steps: SETTLE_STEPS, budgetMs: 10000, probe: -1, wantCells: false }).message;
+  const mark = defaultMarkedParticle(first.positions, settings.setup);
+  const { message } = runner.frame({ steps: 1, budgetMs: 10000, probe: mark, wantCells: false });
 
-  const viewport = new Viewport(document.getElementById("view"));
+  const viewport = new Viewport(
+    { graticule: document.getElementById("graticule"), particles: document.getElementById("particles"), overlay: document.getElementById("view") },
+    { persistence: true });
   viewport.setup("plummer");
   viewport.fit();
   const frame = {
     positions: message.positions,
     bands: message.bands,
-    cells: message.cells,
+    stepped: true,
+    mark,
+    cells: null,
     probe: message.probe,
     trails: [],
-    showCells: true,
+    showCells: false,
   };
   const times = [];
   for (let draw = 0; draw < WARM_UP_DRAWS + DRAWS; draw++) {

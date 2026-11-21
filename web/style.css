@@ -52,6 +52,8 @@
   --view-dim: oklch(0.7 0.02 255);
   --view-rule: oklch(0.32 0.03 262);
   --view-tree: oklch(0.8 0.14 78);
+  --view-grid: oklch(0.3 0.04 262);
+  --view-axis: oklch(0.46 0.04 262);
 
   --r-s: 3px;
   --r-m: 6px;
@@ -146,31 +148,40 @@ section[id] { scroll-margin-top: 72px; }
 @media (min-width: 960px) {
   .sim { grid-template-columns: minmax(0, 1fr) 21.5rem; grid-template-areas: "view rail" "transport rail" "energy rail"; grid-template-rows: auto auto 1fr; }
 }
-.viewport {
-  grid-area: view; position: relative; background: var(--view-bg); color: var(--view-ink);
-  border-radius: var(--r-m); overflow: hidden; border: 1px solid var(--view-rule);
-  aspect-ratio: 1 / 1; max-height: 78vh; min-height: 18rem; width: 100%;
+.scope { grid-area: view; margin: 0; min-width: 0; border: 1px solid var(--rule-strong); border-radius: var(--r-m); background: var(--surface); }
+.scope-head, .scope-foot {
+  display: flex; justify-content: space-between; align-items: center; gap: var(--sp-2) var(--sp-4); flex-wrap: wrap;
+  padding: 10px 14px; font-size: 0.8125rem; line-height: 1.4; color: var(--ink-2);
 }
-@media (min-width: 960px) { .viewport { aspect-ratio: 5 / 4; } }
-.viewport canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; cursor: crosshair; }
+.scope-head { border-bottom: 1px solid var(--rule); }
+.scope-foot { border-top: 1px solid var(--rule); display: block; }
+.scope-foot b { font-weight: 600; color: var(--ink); }
+.fig-id { font: 600 0.8125rem var(--font-mono); color: var(--ink); margin-right: var(--sp-2); }
+.glass {
+  position: relative; margin: 10px; aspect-ratio: 1 / 1; overflow: hidden;
+  background: var(--view-bg); color: var(--view-ink); border-radius: 2px;
+  box-shadow: inset 0 0 0 1px var(--view-rule), inset 0 1px 18px oklch(0.05 0.02 262 / 0.7);
+}
+@media (min-width: 720px) { .glass { aspect-ratio: 16 / 11; } }
+.glass canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.glass canvas#view { pointer-events: auto; touch-action: pan-y; cursor: crosshair; }
 .hud { position: absolute; font-size: 0.8125rem; line-height: 1.35; color: var(--view-dim); pointer-events: none; }
-.hud-tl { top: 12px; left: 14px; display: flex; align-items: center; gap: 8px; color: var(--view-ink); }
-.hud-bl { bottom: 12px; left: 14px; display: flex; align-items: center; gap: 8px; }
-.hud-br { bottom: 12px; right: 14px; text-align: right; max-width: 60%; color: var(--view-ink); }
-.hud-br .dim { color: var(--view-dim); }
-.hud-tr { top: 8px; right: 8px; pointer-events: auto; }
-@media (max-width: 719px) { .hud-bl span:last-child { display: none; } .hud-br { max-width: 70%; font-size: 0.75rem; } }
+.hud-tl { top: 10px; left: 12px; display: flex; align-items: center; gap: 8px; color: var(--view-ink); font: 500 0.75rem var(--font-mono); }
+.hud-tr { top: 10px; right: 12px; font: 500 0.75rem var(--font-mono); }
+.hud-tr b { font-weight: 500; color: var(--view-ink); }
+.hud-scale { top: 34px; right: 12px; display: flex; align-items: center; gap: 8px; font: 500 0.6875rem var(--font-mono); }
+@media (max-width: 719px) { .hud-scale span:last-child, .clock { display: none; } }
 .scale-bar { display: inline-block; height: 5px; border: 1px solid var(--view-dim); border-top: 0; }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--view-tree); flex: none; }
 .live-dot[data-live="off"] { background: transparent; border: 1.5px solid var(--view-dim); }
 .toggle {
-  min-height: 36px; padding: 0 12px; border-radius: var(--r-s); border: 1px solid var(--view-rule);
-  background: color-mix(in oklch, var(--view-bg) 80%, transparent); color: var(--view-ink); cursor: pointer; font-size: 0.8125rem; font-weight: 500;
+  min-height: 36px; padding: 0 12px; border-radius: var(--r-s); border: 1px solid var(--rule-strong);
+  background: var(--surface); color: var(--ink); cursor: pointer; font-size: 0.8125rem; font-weight: 500;
   display: inline-flex; align-items: center; gap: 8px;
 }
-.toggle::before { content: ""; width: 10px; height: 10px; border: 1.5px solid var(--view-tree); border-radius: 2px; }
-.toggle[aria-pressed="true"]::before { background: var(--view-tree); }
-.toggle:hover { border-color: var(--view-dim); }
+.toggle::before { content: ""; width: 10px; height: 10px; border: 1.5px solid var(--tree); border-radius: 2px; }
+.toggle[aria-pressed="true"]::before { background: var(--tree); }
+.toggle:hover { background: var(--sunken); }
 
 .overlay-state {
   position: absolute; inset: 0; display: none; place-content: center; justify-items: start; gap: 10px; padding: 24px;

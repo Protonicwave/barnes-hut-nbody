@@ -35,12 +35,18 @@
 
   <section id="simulator" aria-label="Simulator" class="sim">
 
-    <div class="viewport" id="viewport">
-      <canvas id="view" aria-label="Particles projected along the z axis. Hover or tap a particle to see which tree cells its force is summed from."></canvas>
+    <figure class="scope" id="viewport">
+      <div class="scope-head">
+        <span><span class="fig-id">Fig. 1</span> Particles projected along the z axis</span>
+        <button class="toggle" id="cellsToggle" type="button" aria-pressed="false">Whole tree</button>
+      </div>
+      <div class="glass">
+      <canvas id="graticule" aria-hidden="true"></canvas>
+      <canvas id="particles" aria-hidden="true"></canvas>
+      <canvas id="view" role="img" aria-label="Particles on a ruled grid, projected along the z axis. One particle is marked, with the tree cells its force is summed from outlined. Hover or tap a particle to mark it."></canvas>
       <div class="hud hud-tl"><span class="live-dot" id="liveDot" data-live="off"></span><span id="modeBadge">Loading</span></div>
-      <div class="hud hud-tr"><button class="toggle" id="cellsToggle" type="button" aria-pressed="true">Tree cells</button></div>
-      <div class="hud hud-bl"><span class="scale-bar" id="scaleBar"></span><span>1 length unit</span></div>
-      <div class="hud hud-br" id="probeHud" aria-live="off"><span class="dim">Hover or tap a particle to see its tree walk.</span></div>
+      <div class="hud hud-tr clock">t = <b id="clockValue">0.00</b></div>
+      <div class="hud hud-scale"><span class="scale-bar" id="scaleBar"></span><span>1 length unit</span></div>
       <div class="overlay-state" id="stateLoading" data-show="true" role="status">
         <h2>Loading the simulation</h2>
         <div class="loadline"></div>
@@ -52,7 +58,9 @@
         <p class="detail" id="failedDetail"></p>
         <button class="btn" type="button" id="reloadBtn">Reload</button>
       </div>
-    </div>
+      </div>
+      <figcaption class="scope-foot" id="scopeCaption" aria-live="polite">The marked particle's tree walk appears once the simulation runs.</figcaption>
+    </figure>
 
     <div class="transport">
       <div class="transport-main">

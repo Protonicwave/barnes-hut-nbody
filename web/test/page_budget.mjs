@@ -217,9 +217,13 @@ async function main() {
     console.error(`no result after ${OVERALL_TIMEOUT_MS / 1000} s`);
     process.exit(2);
   }, OVERALL_TIMEOUT_MS);
-  const kib = await javascriptKiB();
-  const { draw, lcp, cls } = await measure(chrome);
-  clearTimeout(timer);
+  let measured;
+  try {
+    measured = { kib: await javascriptKiB(), ...(await measure(chrome)) };
+  } finally {
+    clearTimeout(timer);
+  }
+  const { kib, draw, lcp, cls } = measured;
   const within = report([
     ["own JavaScript, gzip", kib, JAVASCRIPT_BUDGET_KIB, "KiB"],
     ["viewport draw, median", draw, DRAW_BUDGET_MS, "ms"],
