@@ -23,7 +23,7 @@
 
 /* ------------------------------------------------------------------ tokens
    Paper and ink for the notebook, a fixed dark glass for the instrument.
-   The one accent (amber) belongs to the tree. */
+   The one accent (amber) belongs to the tree walk. */
 :root {
   color-scheme: light dark;
   --font-display: "Source Serif 4", "Iowan Old Style", Georgia, serif;
@@ -39,7 +39,7 @@
   --rule: light-dark(oklch(0.87 0.01 245), oklch(0.31 0.015 255));
   --rule-strong: light-dark(oklch(0.76 0.015 245), oklch(0.45 0.02 255));
 
-  /* The accent belongs to the tree: cells, the tree series, the tree timing. */
+  /* The accent belongs to the tree: the walk's cells, the tree series, the tree timing. */
   --tree: light-dark(oklch(0.6 0.15 62), oklch(0.78 0.13 75));
   --tree-ink: light-dark(oklch(0.46 0.13 58), oklch(0.8 0.13 75));
   --tree-soft: light-dark(oklch(0.8 0.1 75), oklch(0.5 0.08 70));
@@ -163,8 +163,8 @@ section[id] { scroll-margin-top: 72px; }
 }
 .toggle::before { content: ""; width: 10px; height: 10px; border: 1.5px solid var(--ink-3); border-radius: 2px; }
 .toggle[aria-pressed="true"]::before { background: var(--ink-3); }
-.toggle:hover { background: var(--sunken); }
-.toggle:disabled { opacity: 0.45; cursor: not-allowed; background: var(--paper); }
+.toggle:hover:not(:disabled) { background: var(--sunken); }
+.toggle:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .overlay-state {
   position: absolute; inset: 0; display: none; place-content: center; justify-items: start; gap: 10px; padding: 24px;

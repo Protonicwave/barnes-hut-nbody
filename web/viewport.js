@@ -83,7 +83,6 @@ export class Viewport {
       grid: cssVariable("--view-grid"),
       axis: cssVariable("--view-axis"),
       tree: cssVariable("--view-tree"),
-      cells: cssVariable("--view-dim"),
     };
     this.#particlesAreStale = true;
     this.#drawGraticule();
@@ -268,7 +267,8 @@ export class Viewport {
 
   #drawCells(cells) {
     const context = this.#overlay;
-    context.strokeStyle = this.#colours.cells;
+    context.strokeStyle = this.#colours.dim;
+    context.lineWidth = 1;
     context.globalAlpha = 0.5;
     context.beginPath();
     for (let k = 0; k < cells.length; k += NUMBERS_PER_CELL) {

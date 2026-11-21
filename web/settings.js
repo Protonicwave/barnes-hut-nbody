@@ -106,8 +106,8 @@ export function controlState(settings) {
   };
 }
 
-// Whether the octree cells are drawn and requested: only the tree has cells,
-// and the Kepler setup has no view of them.
+// Whether the whole octree is drawn and requested. Direct summation has no
+// tree, and the Kepler setup builds none, so the toggle only counts for Tree.
 export function wholeTreeShown(showCells, settings) {
   return showCells && settings.method === "tree" && settings.setup !== "kepler";
 }
