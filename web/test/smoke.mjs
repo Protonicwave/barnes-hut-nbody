@@ -10,12 +10,17 @@ import {
   PARTICLE_COUNTS,
   SOFTENING_SCALES,
   TIMESTEP_LABELS,
+  VIEW_RADIUS,
   controlState,
   labels,
   moduleState,
   particleCount,
   withChange,
 } from "../settings.js";
+import { readFileSync } from "node:fs";
+import { decadeFraction, figureCaptions } from "../charts.js";
+import { runRecord } from "../record.js";
+import { defaultMarkedParticle, openedLeaves, openingTest, walkCounts } from "../scope.js";
 import createThreaded from "../wasm/threads/nbody.js";
 import createSingle from "../wasm/single/nbody.js";
 
@@ -134,6 +139,33 @@ describe("both builds", () => {
       assert.ok(trace.opened.length > 0);
       assert.throws(() => simulation.walkTrace(COUNT), new RegExp(`index.*got ${COUNT}`));
       assert.throws(() => simulation.walkTrace(-1), /index.*got -1/);
+      simulation.delete();
+    });
+
+    it(`${name}: reports the centre of mass of each accepted cell, which passes the opening test`, () => {
+      const theta = 0.5;
+      const simulation = plummer(module);
+      const { accepted, acceptedCentresOfMass } = simulation.walkTrace(3);
+      assert.ok(accepted.length > 0);
+      assert.equal(acceptedCentresOfMass.length, (accepted.length / 5) * 3);
+      const position = simulation.positions().slice(9, 12);
+      for (let cell = 0; cell < accepted.length / 5; cell++) {
+        const edge = accepted[5 * cell + 3];
+        const centre = accepted.slice(5 * cell, 5 * cell + 3);
+        const mass = acceptedCentresOfMass.slice(3 * cell, 3 * cell + 3);
+        const distance = Math.hypot(...position.map((x, axis) => x - mass[axis]));
+        const offset = Math.hypot(...mass.map((x, axis) => x - centre[axis]));
+        assert.ok(distance * theta > edge + theta * offset, `cell ${cell} fails the opening test`);
+      }
+      simulation.delete();
+    });
+
+    it(`${name}: reports total momentum and centre of mass as three numbers near zero`, () => {
+      const simulation = plummer(module);
+      for (const vector of [simulation.momentum(), simulation.centreOfMass()]) {
+        assert.equal(vector.length, 3);
+        assert.ok([...vector].every((x) => Math.abs(x) < 1e-15), `${vector}`);
+      }
       simulation.delete();
     });
 
@@ -300,6 +332,132 @@ describe("page controls reach the simulation with the value their label shows", 
   });
 });
 
+describe("conservation and the force change time in a frame", () => {
+  const direct = withChange(SMALL, "method", "direct");
+
+  it("conservation is all zero on the first frame", () => {
+    const runner = new Runner(single, SMALL);
+    assert.deepEqual(frame(runner, { steps: 0 }).conservation, { energy: 0, momentum: 0, centre: 0 });
+    runner.close();
+  });
+
+  it("direct summation changes the momentum by under 1e-12, and energy is the last sample", () => {
+    const runner = new Runner(single, direct);
+    const message = frame(runner, { steps: 32 });
+    const { conservation } = message;
+    assert.ok(conservation.momentum < 1e-12, `momentum ${conservation.momentum}`);
+    assert.ok(conservation.centre < 1e-12, `centre ${conservation.centre}`);
+    assert.equal(message.samples.length, 2);
+    assert.equal(conservation.energy, message.samples.at(-1)[1]);
+    assert.ok(conservation.energy > 0);
+    runner.close();
+  });
+
+  it("a method change measures from the current state, so every reading is zero again", () => {
+    const runner = new Runner(single, SMALL);
+    assert.ok(frame(runner, { steps: 32 }).conservation.energy > 0);
+    runner.change(direct);
+    assert.deepEqual(frame(runner, { steps: 0 }).conservation, { energy: 0, momentum: 0, centre: 0 });
+    runner.close();
+  });
+
+  it("forceChangedAt is null after create and restart, the time after theta or method, and unmoved by threads", () => {
+    const runner = new Runner(threaded, SMALL);
+    frame(runner, { steps: 4 });
+    assert.equal(frame(runner, { steps: 0 }).forceChangedAt, null);
+    runner.change(withChange(SMALL, "threads", 2));
+    assert.equal(frame(runner, { steps: 0 }).forceChangedAt, null);
+    const tuned = withChange(SMALL, "theta", 0.3);
+    runner.change(tuned);
+    const at = frame(runner, { steps: 0 }).forceChangedAt;
+    assert.ok(Math.abs(at - 4 / 128) < 1e-12, `${at}`);
+    runner.change(withChange(tuned, "threads", 4));
+    assert.equal(frame(runner, { steps: 0 }).forceChangedAt, at);
+    frame(runner, { steps: 4 });
+    runner.change(withChange(tuned, "method", "direct"));
+    assert.ok(frame(runner, { steps: 0 }).forceChangedAt > at);
+    runner.change(withChange(tuned, "run", 1));
+    assert.equal(frame(runner, { steps: 0 }).forceChangedAt, null);
+    runner.close();
+  });
+});
+
+describe("the run record", () => {
+  const DEFAULT_RECORD = [
+    "import numpy as np",
+    "import barnes_hut as bh",
+    "",
+    "# same seed; the starting particles can differ from this tab by platform",
+    "positions, velocities, masses = bh.plummer_sphere(1024, seed=1)",
+    "simulation = bh.Simulation(",
+    "    positions, velocities, masses,",
+    "    dt=1 / 128, softening=4 / np.sqrt(1024),",
+    '    method="tree", theta=0.5, threads=8,',
+    ")",
+    "start = simulation.total_energy()",
+    "simulation.step(1600)",
+    "print(abs(simulation.total_energy() - start) / abs(start))",
+  ].join("\n");
+
+  it("is the README call for the default settings at t = 12.5", () => {
+    assert.equal(runRecord(DEFAULT_SETTINGS, 12.5, null), DEFAULT_RECORD);
+  });
+
+  it("builds a cold collapse with uniform_sphere and carries every setting", () => {
+    const settings = { ...DEFAULT_SETTINGS, setup: "collapse", countIndex: 4, seed: 7, softeningScale: 2, timestepIndex: 2, method: "direct", theta: 0.7, threads: 2 };
+    const record = runRecord(settings, 1, null);
+    assert.match(record, /bh\.uniform_sphere\(4096, seed=7\)/);
+    assert.match(record, /dt=1 \/ 64, softening=2 \/ np\.sqrt\(4096\)/);
+    assert.match(record, /method="direct", theta=0\.7, threads=2/);
+    assert.match(record, /simulation\.step\(64\)/);
+  });
+
+  it("builds the Kepler binary with no softening and no count or seed", () => {
+    const record = runRecord({ ...DEFAULT_SETTINGS, setup: "kepler" }, 0.5, null);
+    assert.match(record, /bh\.kepler_binary\(eccentricity=0\.5, semi_major_axis=1\.0\)/);
+    assert.match(record, /softening=0,/);
+    assert.doesNotMatch(record, /seed|sqrt|platform/);
+  });
+
+  it("notes a method or theta change only when the force was changed", () => {
+    const note = "# method or theta changed at t = 3.25; this call runs the current settings from t = 0";
+    assert.ok(!runRecord(DEFAULT_SETTINGS, 12.5, null).includes("changed at"));
+    const record = runRecord(DEFAULT_SETTINGS, 12.5, 3.25);
+    assert.equal(record, `${note}\n${DEFAULT_RECORD}`);
+  });
+});
+
+describe("decadeFraction", () => {
+  it("places a value on a log scale, clamped to the ends", () => {
+    assert.equal(decadeFraction(1e-6, -6, -1), 0);
+    assert.ok(Math.abs(decadeFraction(1e-4, -6, -1) - 0.4) < 1e-12);
+    assert.equal(decadeFraction(1e-1, -6, -1), 1);
+    assert.equal(decadeFraction(0, -6, -1), 0);
+    assert.equal(decadeFraction(1e-9, -6, -1), 0);
+    assert.equal(decadeFraction(1, -6, -1), 1);
+  });
+});
+
+describe("figureCaptions", () => {
+  const results = JSON.parse(readFileSync(new URL("../data/results.json", import.meta.url), "utf8"));
+  const captions = figureCaptions({ ...results, machine: { ...results.machine, cpu: "Test CPU" } });
+
+  it("names the machine and the thread count on the speed and scaling plates and the table", () => {
+    for (const text of [captions.time, captions.threads, captions.wasm]) {
+      assert.ok(text.includes("Test CPU"), text);
+      assert.ok(text.includes("8 threads"), text);
+    }
+  });
+
+  it("gives the count of the force plate and states no repetition count", () => {
+    assert.ok(captions.force.includes("N = 16,384"), captions.force);
+    assert.ok(captions.drift.includes("N = 4,096"), captions.drift);
+    assert.ok(captions.drift.includes("Δt = 1/128"), captions.drift);
+    assert.ok(captions.drift.includes("θ = 0.3, 0.5, 0.7, 1"), captions.drift);
+    assert.ok(!Object.values(captions).some((text) => text.includes("repetitions")));
+  });
+});
+
 describe("page states", () => {
   it("a failed module load shows the failed state with a Reload button and locked controls", () => {
     const state = moduleState("failed", "single", 1);
@@ -375,6 +533,111 @@ describe("frames", () => {
     const message = runner.frame({ steps: 16, budgetMs: 12, probe: -1, wantCells: false }).message;
     assert.ok(message.time < 16 / 128);
     assert.ok(message.time > 0);
+    runner.close();
+  });
+});
+
+describe("the scope's claims about one particle's walk", () => {
+  const TRACED = 3;
+  const traced = (settings = SMALL) => {
+    const runner = new Runner(single, settings);
+    return { runner, message: frame(runner, { steps: 0, probe: TRACED }) };
+  };
+  const independentWalk = () => {
+    const simulation = single.Simulation.create("plummer", 256, SMALL.seed, "tree", SMALL.theta, 4 / Math.sqrt(256), DT, 1);
+    const trace = simulation.walkTrace(TRACED);
+    const position = simulation.positions().slice(3 * TRACED, 3 * TRACED + 3);
+    simulation.delete();
+    return { trace, position };
+  };
+
+  it("the probe's opening test is s / (d - delta) for the accepted cell with the largest edge, below theta", () => {
+    const { runner, message } = traced();
+    const { test } = message.probe;
+    const { trace, position } = independentWalk();
+    const edges = Array.from({ length: trace.accepted.length / 5 }, (_, cell) => trace.accepted[5 * cell + 3]);
+    const mass = trace.acceptedCentresOfMass.slice(3 * test.cell, 3 * test.cell + 3);
+    const centre = trace.accepted.slice(5 * test.cell, 5 * test.cell + 3);
+    const distance = Math.hypot(...position.map((x, axis) => x - mass[axis]));
+    const offset = Math.hypot(...mass.map((x, axis) => x - centre[axis]));
+    assert.equal(test.edge, Math.max(...edges));
+    assert.ok(Math.abs(test.ratio - test.edge / (distance - offset)) < 1e-12);
+    assert.ok(test.ratio < SMALL.theta);
+    assert.equal(test.theta, SMALL.theta);
+    runner.close();
+  });
+
+  it("the probe is absent under direct summation, where there is no walk to show", () => {
+    const runner = new Runner(single, SMALL);
+    runner.change({ ...SMALL, method: "direct" });
+    assert.equal(frame(runner, { steps: 0, probe: TRACED }).probe, null);
+    runner.close();
+  });
+
+  it("opening test picks the largest edge, then the nearest, and is null with no accepted cell", () => {
+    const centres = new Float64Array([0, 0, 0, 4, 0, 0, 1, 0, 0, 0, 0, 0]);
+    const accepted = new Float64Array([0, 0, 0, 1, 3, 0, 0, 0, 2, 2, 1, 0, 0, 2, 2, 0, 0, 0, 1, 3]);
+    const test = openingTest(accepted, centres, [0, 0, 0], 0.5);
+    assert.equal(test.cell, 2);
+    assert.equal(test.edge, 2);
+    assert.equal(test.distance, 1);
+    assert.equal(test.offset, 0);
+    assert.equal(test.ratio, 2);
+    assert.equal(openingTest(new Float64Array(0), new Float64Array(0), [0, 0, 0], 0.5), null);
+  });
+
+  it("walk counts add up to the interactions, give N - 1 for direct and nothing for a binary", () => {
+    const { runner, message } = traced();
+    const counts = walkCounts(message.probe, message.count, "plummer", "tree");
+    assert.equal(counts.cells + counts.particles, message.probe.interactions);
+    assert.equal(counts.cells, message.probe.accepted.length / 5);
+    assert.deepEqual(walkCounts(null, 256, "plummer", "direct"), { cells: 0, particles: 255 });
+    assert.equal(walkCounts(null, 256, "plummer", "tree"), null);
+    assert.equal(walkCounts(null, 2, "kepler", "tree"), null);
+    assert.equal(walkCounts(null, 2, "kepler", "direct"), null);
+    runner.close();
+  });
+
+  it("the default mark is the particle nearest the aim point, and absent for a binary or no positions", () => {
+    for (const setup of ["plummer", "collapse"]) {
+      const runner = new Runner(single, { ...SMALL, setup });
+      const { positions } = frame(runner, { steps: 0 });
+      const aim = [0.5 * VIEW_RADIUS[setup], -0.25 * VIEW_RADIUS[setup]];
+      const distances = Array.from({ length: positions.length / 2 }, (_, i) =>
+        Math.hypot(positions[2 * i] - aim[0], positions[2 * i + 1] - aim[1]));
+      assert.equal(defaultMarkedParticle(positions, setup), distances.indexOf(Math.min(...distances)));
+      runner.close();
+    }
+    assert.equal(defaultMarkedParticle(new Float32Array([0, 0, 1, 1]), "kepler"), -1);
+    assert.equal(defaultMarkedParticle(undefined, "plummer"), -1);
+    assert.equal(defaultMarkedParticle(new Float32Array(0), "plummer"), -1);
+  });
+
+  it("a leaf is an opened cell with no visited child, and the root is not one", () => {
+    const { runner, message } = traced({ ...SMALL, countIndex: 2 });
+    const { opened, accepted, openedLeaves: leaves } = message.probe;
+    assert.equal(leaves.length, opened.length / 5);
+    assert.equal(opened[4], 0);
+    assert.equal(leaves[0], 0);
+    const children = (first) => {
+      const half = opened[first + 3] / 2;
+      const inside = (cells, k) => cells[k + 4] === opened[first + 4] + 1 &&
+        [0, 1, 2].every((axis) => Math.abs(cells[k + axis] - opened[first + axis]) < half);
+      let found = 0;
+      for (const cells of [opened, accepted]) {
+        for (let k = 0; k < cells.length; k += 5) {
+          found += inside(cells, k) ? 1 : 0;
+        }
+      }
+      return found;
+    };
+    let leafCount = 0;
+    for (let cell = 0; cell < leaves.length; cell++) {
+      assert.equal(leaves[cell] === 1, children(5 * cell) === 0, `cell ${cell}`);
+      leafCount += leaves[cell];
+    }
+    assert.ok(leafCount > 0);
+    assert.equal(openedLeaves(new Float64Array(0), new Float64Array(0)).length, 0);
     runner.close();
   });
 });

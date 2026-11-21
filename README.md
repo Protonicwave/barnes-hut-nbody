@@ -91,7 +91,8 @@ whatever the force method. Invalid arguments throw an `Error` naming the
 value. Also on `Simulation`: `setForceSettings(method, theta, threads)`,
 `evaluateForces(method)`, `compare(method)` (median and 99th-percentile force
 error against direct summation, and mean interactions per particle),
-`treeCells(maxDepth)` and `walkTrace(index)`. The views point into the heap, so
+`treeCells(maxDepth)` and `walkTrace(index)`, which also gives the centre of
+mass of each accepted cell. The views point into the heap, so
 read them before the next call. The
 threaded build needs a worker: it joins its threads with a blocking wait,
 which a page's main thread may not do, so `web/worker.js` runs the module.
@@ -99,7 +100,10 @@ which a page's main thread may not do, so `web/worker.js` runs the module.
 `web/index.html` is the simulator page. It runs the module in the worker
 `web/worker.js` and draws the particles, the octree cells and one particle's
 tree walk, with live timings of direct and tree evaluation, the relative energy
-error, and the results figures below. `web/data/results.json` holds the figures
+error, and the results figures below. The panel opens with a run record, the
+Python call that repeats the run on screen, and three conservation meters:
+the relative energy error, the change in total momentum and the shift of the
+centre of mass, each since the start of the run or the last method change. `web/data/results.json` holds the figures
 it draws, written from `results/` by `python scripts/export_page_data.py`. The
 fonts in `web/fonts/` are Source Serif 4, Source Sans 3 and Source Code Pro
 under the SIL Open Font Licence. Screenshots are in `docs/screenshots/`.
@@ -117,9 +121,13 @@ at http://127.0.0.1:8000/ with them (the batch file also opens the page, and
 needs the Wasm builds above in place), and
 `--no-isolation` leaves them out, which shows the page fall back to the
 single-threaded build with a banner saying so. In headless Chrome on the
-development machine the page loads in 256 ms to its largest paint on the
-single-threaded build, with no layout shift, and its own JavaScript is 15 KiB
-compressed.
+development machine the page loads in 0.6 s to its largest paint on the
+single-threaded build, with no layout shift, and its own JavaScript is 23 KiB
+compressed. `web/test/page_budget.mjs` measures those figures and the time of
+one viewport draw at 8192 particles, prints each beside its budget and exits 1
+when any is over:
+
+    node web/test/page_budget.mjs --chrome "C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 The `deploy` job in `.github/workflows/ci.yml` publishes `web/`, with both
 Wasm builds and without the Python and test files, to Cloudflare Pages on every

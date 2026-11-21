@@ -12,6 +12,7 @@ import {
   softening,
   timestep,
 } from "./settings.js";
+import { openedLeaves, openingTest } from "./scope.js";
 
 // Deepest octree level drawn, and steps between recomputing the cells: the
 // tree moves slowly, and building it again costs about one force evaluation.
@@ -33,6 +34,10 @@ export class Runner {
   #stepsTaken = 0;
   #frames = 0;
   #baseline = 0;
+  #momentumBaseline = null;
+  #centreBaseline = null;
+  #latestEnergyError = 0;
+  #forceChangedAt = null;
   #seriesId = 0;
   #pendingSamples = [];
   #stepsSinceCells = Infinity;
@@ -49,6 +54,7 @@ export class Runner {
   // Applies new settings and returns what kind of change they were.
   change(next) {
     const kind = changeKind(this.#settings, next);
+    const forceChanged = kind === "method" || (kind === "tune" && this.#settings.theta !== next.theta);
     this.#settings = next;
     if (kind === "restart") {
       this.#simulation.delete();
@@ -59,8 +65,12 @@ export class Runner {
       this.#simulation.setForceSettings(next.method, next.theta, next.threads);
       this.#measureAgain = true;
     }
+    if (forceChanged) {
+      this.#forceChangedAt = this.#simulation.time();
+    }
     if (isEnergyBaselineReset(kind)) {
       this.#baseline = this.#simulation.energy();
+      this.#startConservation();
       this.#startSeries();
     }
     return kind;
@@ -86,6 +96,8 @@ export class Runner {
       count,
       seriesId: this.#seriesId,
       samples: this.#pendingSamples,
+      conservation: this.#conservation(),
+      forceChangedAt: this.#forceChangedAt,
       positions,
       bands,
       cells: this.#cells(wantCells, resendCells),
@@ -101,12 +113,32 @@ export class Runner {
     this.#simulation = this.#module.Simulation.create(
       s.setup, particleCount(s), s.seed, s.method, s.theta, softening(s), timestep(s), s.threads);
     this.#baseline = this.#simulation.initialEnergy();
+    this.#startConservation();
+    this.#forceChangedAt = null;
     this.#stepsTaken = 0;
     this.#frames = 0;
     this.#stepsSinceCells = Infinity;
     this.#measureAgain = false;
     this.#lastMeasuredFrame = 0;
     this.#startSeries();
+  }
+
+  // Momentum and centre of mass are measured from the state the energy is.
+  #startConservation() {
+    this.#momentumBaseline = this.#simulation.momentum();
+    this.#centreBaseline = this.#simulation.centreOfMass();
+    this.#latestEnergyError = 0;
+  }
+
+  // How far the run has moved from its baseline: relative energy error at the
+  // last sample, size of the momentum change and of the centre of mass shift.
+  #conservation() {
+    const distance = (now, before) => Math.hypot(...now.map((x, axis) => x - before[axis]));
+    return {
+      energy: this.#latestEnergyError,
+      momentum: distance(this.#simulation.momentum(), this.#momentumBaseline),
+      centre: distance(this.#simulation.centreOfMass(), this.#centreBaseline),
+    };
   }
 
   #startSeries() {
@@ -124,6 +156,7 @@ export class Runner {
       this.#stepsTaken += 1;
       if (this.#stepsTaken % interval === 0) {
         const error = Math.abs(this.#simulation.energy() - this.#baseline) / Math.abs(this.#baseline);
+        this.#latestEnergyError = error;
         this.#pendingSamples.push([this.#simulation.time(), error]);
       }
       if (this.#now() - start > budgetMs) {
@@ -167,16 +200,24 @@ export class Runner {
     return this.#simulation.treeCells(OVERLAY_DEPTH);
   }
 
+  // The tree walk of one particle, with the opening test of its largest
+  // accepted cell. Null when there is no tree to walk: a binary, or direct
+  // summation.
   #probe(index, count) {
-    if (!(index >= 0 && index < count) || this.#settings.setup === "kepler") {
+    const { setup, method, theta } = this.#settings;
+    if (!(index >= 0 && index < count) || setup === "kepler" || method === "direct") {
       return null;
     }
     const trace = this.#simulation.walkTrace(index);
+    const position = this.#simulation.positions().slice(3 * index, 3 * index + 3);
     return {
       index,
       interactions: trace.interactions,
       accepted: trace.accepted,
+      acceptedCentresOfMass: trace.acceptedCentresOfMass,
       opened: trace.opened,
+      openedLeaves: openedLeaves(trace.opened, trace.accepted),
+      test: openingTest(trace.accepted, trace.acceptedCentresOfMass, position, theta),
     };
   }
 
@@ -216,7 +257,11 @@ function transferables(message) {
     buffers.push(message.cells.buffer);
   }
   if (message.probe) {
-    buffers.push(message.probe.accepted.buffer, message.probe.opened.buffer);
+    buffers.push(
+      message.probe.accepted.buffer,
+      message.probe.acceptedCentresOfMass.buffer,
+      message.probe.opened.buffer,
+      message.probe.openedLeaves.buffer);
   }
   return buffers;
 }

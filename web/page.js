@@ -2,7 +2,7 @@
 // results figures. The simulation itself runs in worker.js, which this file
 // asks for one frame at a time.
 
-import { drawEnergy, drawFigures, formatInteger, formatMilliseconds, scientific } from "./charts.js";
+import { decadeFraction, drawEnergy, drawFigures, formatInteger, formatMilliseconds, scientific } from "./charts.js";
 import {
   PARTICLE_COUNTS,
   changeKind,
@@ -12,6 +12,8 @@ import {
   moduleState,
   withChange,
 } from "./settings.js";
+import { runRecord } from "./record.js";
+import { defaultMarkedParticle, walkCounts } from "./scope.js";
 import { Viewport } from "./viewport.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -24,6 +26,15 @@ const MAX_TRAILED_PARTICLES = 8;
 // Frames between updates of the read-outs and the energy strip while running.
 const READOUT_INTERVAL_FRAMES = 6;
 const COPIED_MESSAGE_MS = 1600;
+// The conservation meters share one log scale, 1e-6 to 1e-1.
+const METER_LOW_DECADE = -6;
+const METER_HIGH_DECADE = -1;
+const METERS = [
+  { key: "energy", value: "#mEnergy", track: "#trEnergy" },
+  { key: "momentum", value: "#mMomentum", track: "#trMomentum" },
+  { key: "centre", value: "#mCentre", track: "#trCentre" },
+];
+const NO_CONSERVATION = { energy: 0, momentum: 0, centre: 0 };
 
 const SETUP_HINTS = {
   plummer: "Virial units, G = M = 1. A cluster in equilibrium.",
@@ -32,14 +43,16 @@ const SETUP_HINTS = {
 };
 
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const viewport = new Viewport($("#view"));
+const viewport = new Viewport(
+  { graticule: $("#graticule"), particles: $("#particles"), overlay: $("#view") },
+  { persistence: !reducedMotion });
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 
 let status = "loading";
 let variant = null;
 let settings = initialSettings(1, 1);
 let generation = 0;
-const view = { running: !reducedMotion, speed: 4, showCells: true };
+const view = { running: !reducedMotion, speed: 4, showCells: false };
 
 let latest = null;
 let cells = null;
@@ -47,7 +60,11 @@ let measurement = null;
 let samples = [];
 let seriesId = null;
 let trails = [];
-let probeIndex = -1;
+// The marked particle: the one under the pointer, else the default picked on
+// the first frame after a restart.
+let hoverIndex = -1;
+let defaultMark = -1;
+let captionHtml = "";
 let awaitingFrame = false;
 let needsFrame = true;
 let framesSinceReadout = 0;
@@ -100,6 +117,7 @@ function syncControls() {
   $("#cellsToggle").setAttribute("aria-pressed", String(view.showCells));
   setText("#playBtn", view.running ? "Pause" : "Play");
   setText("#seedNote", text.seed);
+  showRecord();
 
   $("#stateLoading").dataset.show = String(module.showLoading);
   $("#stateFailed").dataset.show = String(module.showFailed);
@@ -121,14 +139,16 @@ function change(key, value) {
   if (kind === "restart") {
     latest = null;
     cells = null;
-    probeIndex = -1;
+    hoverIndex = -1;
+    defaultMark = -1;
     trails = [];
-    showProbe(null);
     viewport.setup(settings.setup);
     fitViewport();
   }
   measurement = null;
   showMeasurement();
+  showMeters();
+  showCaption();
   needsFrame = true;
   syncControls();
 }
@@ -177,47 +197,64 @@ function fitViewport() {
   $("#scaleBar").style.width = `${viewport.scale}px`;
 }
 
+function markedParticle() {
+  return hoverIndex >= 0 ? hoverIndex : defaultMark;
+}
+
 function wireViewport() {
   const canvas = $("#view");
   const pick = (event) => {
     if (settings.setup === "kepler" || !latest) {
       return;
     }
-    probeIndex = viewport.pick(latest.positions, event.clientX, event.clientY);
-    needsFrame = true;
-    if (probeIndex < 0) {
-      showProbe(null);
+    const picked = viewport.pick(latest.positions, event.clientX, event.clientY);
+    if (picked >= 0 && picked !== hoverIndex) {
+      hoverIndex = picked;
+      needsFrame = true;
     }
   };
   canvas.addEventListener("pointermove", (event) => { if (event.pointerType === "mouse") { pick(event); } });
   canvas.addEventListener("pointerdown", pick);
   canvas.addEventListener("pointerleave", (event) => {
     if (event.pointerType === "mouse") {
-      probeIndex = -1;
-      showProbe(null);
+      hoverIndex = -1;
       needsFrame = true;
     }
   });
 }
 
-function showProbe(probe) {
-  const hud = $("#probeHud");
-  if (!probe || !latest) {
-    hud.innerHTML = '<span class="dim">Hover or tap a particle to see its tree walk.</span>';
+// What the figure counted for the marked particle, written under it.
+function showCaption() {
+  const counts = latest && walkCounts(latest.probe, latest.count, settings.setup, settings.method);
+  let html;
+  if (settings.setup === "kepler") {
+    html = "Two bodies, no tree.";
+  } else if (counts && settings.method === "direct") {
+    html = `Marked particle: force summed from <b>${formatInteger(counts.particles)}</b> particles, one by one. No tree.`;
+  } else if (counts) {
+    html = `Marked particle: force summed from <b>${formatInteger(counts.cells)}</b> cells and ` +
+      `<b>${formatInteger(counts.particles)}</b> particles, against <b>${formatInteger(latest.count - 1)}</b> by direct summation. ` +
+      `A cell is used whole when s / (d − δ) &lt; θ = ${settings.theta.toFixed(2)}. Cells are drawn along z, so they overlap.`;
+  } else {
     return;
   }
-  hud.innerHTML = `Particle ${formatInteger(probe.index + 1)}: <b class="num">${formatInteger(probe.interactions)}</b> interactions<br>` +
-    `<span class="dim">direct summation uses ${formatInteger(latest.count - 1)}</span>`;
+  if (html !== captionHtml) {
+    captionHtml = html;
+    $("#scopeCaption").innerHTML = html;
+  }
 }
 
-function draw() {
+// stepped: whether the particles moved since the last draw.
+function draw(stepped = false) {
   viewport.draw({
     positions: latest?.positions,
     bands: latest?.bands,
-    cells,
+    stepped,
+    mark: markedParticle(),
     probe: latest?.probe,
+    cells,
     trails,
-    showCells: view.showCells,
+    showCells: view.showCells && settings.method === "tree",
   });
 }
 
@@ -242,8 +279,23 @@ function showMeasurement() {
   setText("#interDirect", formatInteger(measurement.count - 1));
 }
 
+function showRecord() {
+  setText("#record", runRecord(settings, latest?.time ?? 0, latest?.forceChangedAt ?? null));
+}
+
+function showMeters() {
+  const conservation = latest?.conservation ?? NO_CONSERVATION;
+  for (const { key, value, track } of METERS) {
+    setText(value, scientific(conservation[key]));
+    $(track).style.setProperty("--w", `${100 * decadeFraction(conservation[key], METER_LOW_DECADE, METER_HIGH_DECADE)}%`);
+  }
+}
+
 function showReadouts() {
+  showRecord();
+  showMeters();
   setText("#timeVal", latest.time.toFixed(2));
+  setText("#clockValue", latest.time.toFixed(2));
   const last = samples.at(-1);
   setText("#eNow", last ? scientific(last[1]) : "0");
   showMeasurement();
@@ -279,6 +331,10 @@ function receiveFrame(message) {
   samples.splice(0, Math.max(0, samples.length - MAX_ENERGY_SAMPLES));
   cells = message.cells ?? cells;
   const stepped = !latest || message.time !== latest.time;
+  if (!latest) {
+    defaultMark = defaultMarkedParticle(message.positions, settings.setup);
+    needsFrame = true;
+  }
   latest = message;
   if (stepped && view.running) {
     keepTrails(message);
@@ -286,8 +342,8 @@ function receiveFrame(message) {
   if (message.measurement) {
     measurement = message.measurement;
   }
-  showProbe(message.probe);
-  draw();
+  showCaption();
+  draw(stepped);
   framesSinceReadout += 1;
   if (framesSinceReadout >= READOUT_INTERVAL_FRAMES || !view.running || message.measurement) {
     framesSinceReadout = 0;
@@ -332,8 +388,8 @@ function requestFrames() {
   worker.postMessage({
     type: "frame",
     steps: view.running ? view.speed : 0,
-    probe: probeIndex,
-    wantCells: view.showCells,
+    probe: markedParticle(),
+    wantCells: view.showCells && settings.method === "tree",
     resendCells: cells === null,
   });
 }

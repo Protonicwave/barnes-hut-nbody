@@ -106,6 +106,18 @@ emscripten::val cells_array(const std::vector<nbody::TreeCell>& cells) {
     return array_of(numbers);
 }
 
+// Three numbers per cell: the centre of mass x, y and z, in the order of
+// cells_array.
+emscripten::val centres_of_mass_array(const std::vector<nbody::TreeCell>& cells) {
+    std::vector<double> numbers;
+    numbers.reserve(3 * cells.size());
+    for (const nbody::TreeCell& cell : cells) {
+        numbers.insert(numbers.end(),
+                       {cell.centre_of_mass.x, cell.centre_of_mass.y, cell.centre_of_mass.z});
+    }
+    return array_of(numbers);
+}
+
 // Runs an operation and turns a standard exception into a JavaScript Error.
 template <typename Operation>
 auto rethrow_as_js_error(Operation&& operation) -> decltype(operation()) {
@@ -199,9 +211,10 @@ public:
     }
 
     // The sources the force on one particle is summed from: accepted and
-    // opened cells in the layout of tree_cells, and the number of sources
-    // summed (accepted cells plus single particles). Throws an Error unless index is a whole
-    // number below the particle count.
+    // opened cells in the layout of tree_cells, the centre of mass of each
+    // accepted cell (x, y and z, in the same order), and the number of sources
+    // summed (accepted cells plus single particles). Throws an Error unless
+    // index is a whole number below the particle count.
     [[nodiscard]] emscripten::val walk_trace(double index) const {
         return rethrow_as_js_error([&] {
             const std::size_t particle =
@@ -210,10 +223,22 @@ public:
                 nbody::tree_walk_trace(simulation_.particles(), simulation_.config(), particle);
             emscripten::val result = emscripten::val::object();
             result.set("accepted", cells_array(trace.accepted));
+            result.set("acceptedCentresOfMass", centres_of_mass_array(trace.accepted));
             result.set("opened", cells_array(trace.opened));
             result.set("interactions", trace.interaction_count());
             return result;
         });
+    }
+
+    // Float64Array of three numbers: the total momentum, and the mass-weighted
+    // mean position.
+    [[nodiscard]] emscripten::val momentum() const {
+        const nbody::Vec3 total = nbody::total_momentum(simulation_.particles());
+        return array_of({total.x, total.y, total.z});
+    }
+    [[nodiscard]] emscripten::val centre_of_mass() const {
+        const nbody::Vec3 centre = nbody::centre_of_mass(simulation_.particles());
+        return array_of({centre.x, centre.y, centre.z});
     }
 
     [[nodiscard]] std::size_t size() const { return simulation_.particles().size(); }
@@ -259,6 +284,8 @@ EMSCRIPTEN_BINDINGS(nbody) {
         .function("time", &Simulation::time)
         .function("positions", &Simulation::positions)
         .function("velocities", &Simulation::velocities)
+        .function("momentum", &Simulation::momentum)
+        .function("centreOfMass", &Simulation::centre_of_mass)
         .function("energy", &Simulation::energy)
         .function("initialEnergy", &Simulation::initial_energy);
 }
