@@ -119,7 +119,11 @@ needs the Wasm builds above in place), and
 single-threaded build with a banner saying so. In headless Chrome on the
 development machine the page loads in 256 ms to its largest paint on the
 single-threaded build, with no layout shift, and its own JavaScript is 15 KiB
-compressed.
+compressed. `web/test/page_budget.mjs` measures those figures and the time of
+one viewport draw at 8192 particles, prints each beside its budget and exits 1
+when any is over:
+
+    node web/test/page_budget.mjs --chrome "C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 The `deploy` job in `.github/workflows/ci.yml` publishes `web/`, with both
 Wasm builds and without the Python and test files, to Cloudflare Pages on every
