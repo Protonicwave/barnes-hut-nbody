@@ -223,14 +223,24 @@ select {
 .seg input:disabled:not(:checked) + span { color: var(--ink-3); }
 .range { position: relative; }
 .range input[type="range"] { width: 100%; height: 44px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; display: block; }
-.range input::-webkit-slider-runnable-track { height: 2px; background: var(--rule-strong); }
-.range input::-moz-range-track { height: 2px; background: var(--rule-strong); }
-.range input::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -8px; border-radius: 50%; background: var(--ink); border: 3px solid var(--ground); box-shadow: 0 0 0 1px var(--ink); }
-.range input::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--ink); border: 3px solid var(--ground); box-shadow: 0 0 0 1px var(--ink); }
+.range input::-webkit-slider-runnable-track { height: 44px; background: transparent; }
+.range input::-moz-range-track { height: 44px; background: transparent; }
+.range input::-webkit-slider-thumb { -webkit-appearance: none; width: 4px; height: 30px; margin-top: 7px; border: 0; border-radius: 1px; background: var(--ink); box-shadow: 0 0 0 2px var(--ground); }
+.range input::-moz-range-thumb { width: 4px; height: 30px; border: 0; border-radius: 1px; background: var(--ink); box-shadow: 0 0 0 2px var(--ground); }
 .range input:disabled { cursor: not-allowed; }
-.zone { position: absolute; left: 62.5%; right: 0; top: 50%; height: 6px; margin-top: -3px; background: var(--tree-soft); opacity: 0.6; border-radius: 1px; pointer-events: none; }
 .range input[type="range"] { position: relative; z-index: 1; }
-.ticks { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--ink-3); margin-top: -8px; }
+
+/* The scale under the pointer: minor ticks every --minor, major every --major. */
+.ruler, .zone { position: absolute; left: 0; right: 0; bottom: 6px; height: 12px; pointer-events: none; }
+.ruler {
+  background:
+    repeating-linear-gradient(90deg, var(--rule-strong) 0 1px, transparent 1px var(--minor)) left bottom / 100% 6px no-repeat,
+    repeating-linear-gradient(90deg, var(--ink-3) 0 1px, transparent 1px var(--major)) left bottom / 100% 12px no-repeat,
+    linear-gradient(var(--ink-3), var(--ink-3)) left bottom / 100% 1px no-repeat;
+}
+.ruler::after { content: ""; position: absolute; right: 0; bottom: 0; width: 1px; height: 12px; background: var(--ink-3); }
+.zone { left: 62.5%; background: repeating-linear-gradient(135deg, var(--tree) 0 1px, transparent 1px 4px); opacity: 0.7; }
+.ticks { display: flex; justify-content: space-between; font: 400 0.6875rem var(--font-mono); color: var(--ink-3); }
 
 .banner { border: 1px solid var(--rule-strong); border-left-width: 3px; border-radius: var(--r-s); padding: var(--sp-3); background: var(--paper); font-size: 0.875rem; line-height: 1.45; display: none; gap: 6px; }
 .banner[data-show="true"] { display: grid; }

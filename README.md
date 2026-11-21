@@ -100,7 +100,10 @@ which a page's main thread may not do, so `web/worker.js` runs the module.
 `web/index.html` is the simulator page. It runs the module in the worker
 `web/worker.js` and draws the particles, the octree cells and one particle's
 tree walk, with live timings of direct and tree evaluation, the relative energy
-error, and the results figures below. `web/data/results.json` holds the figures
+error, and the results figures below. The panel opens with a run record, the
+Python call that repeats the run on screen, and three conservation meters:
+the relative energy error, the change in total momentum and the shift of the
+centre of mass, each since the start of the run or the last method change. `web/data/results.json` holds the figures
 it draws, written from `results/` by `python scripts/export_page_data.py`. The
 fonts in `web/fonts/` are Source Serif 4, Source Sans 3 and Source Code Pro
 under the SIL Open Font Licence. Screenshots are in `docs/screenshots/`.
