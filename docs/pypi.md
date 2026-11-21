@@ -8,11 +8,11 @@ Every particle attracts every other under Newtonian gravity with Plummer softeni
 
 Summing every pair costs a number of terms that grows as the square of the particle count. The tree method groups distant particles. Particles are placed in an octree, and a cell is used as one source of mass at its centre of mass when it is far enough away for its size. The opening angle sets that threshold: 0 opens every cell and reproduces the direct sum, and values above about 0.7 are not recommended. For a bounded, roughly uniform distribution the expected cost grows as the particle count times its logarithm.
 
-Time stepping is kick-drift-kick leapfrog with a fixed timestep: a half kick of the velocities, a full drift of the positions, then a second half kick. The scheme is symplectic and second order. The total energy is the kinetic energy minus the softened pairwise potential energy, and the potential is always summed directly, so the tree's error is measured against an exact reference.
+Time stepping is kick-drift-kick leapfrog with a fixed timestep: a half kick of the velocities, a full drift of the positions, then a second half kick. The scheme is symplectic and second order. The total energy is the kinetic energy plus the softened pairwise potential energy, which is negative, and the potential is always summed directly, so the tree's error is measured against an exact reference.
 
 ## Results
 
-On an Intel Core Ultra 5 238V with 8 threads and an opening angle of 0.5, the tree is faster than direct summation from 4096 particles and 10.8 times faster at 65536. At 16384 particles the median relative force error against direct summation is 1.0e-3 at an opening angle of 0.5. The full tables and figures are in the repository.
+On an Intel Core Ultra 5 238V with 8 threads and an opening angle of 0.5, the tree is faster than direct summation from 2048 particles and 10.8 times faster at 65536. At 16384 particles the median relative force error against direct summation is 1.0e-3 at an opening angle of 0.5. The full tables and figures are in the repository.
 
 ## Quick start
 

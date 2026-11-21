@@ -8,7 +8,7 @@ A gravitational N-body simulator in C++20 that uses a Barnes-Hut octree, runs it
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/hero-dark.png">
-  <img alt="The simulator page running a Plummer sphere, with the octree cells and live timings of direct and tree force evaluation" src="docs/screenshots/hero-light.png">
+  <img alt="The simulator page running a Plummer sphere, with the octree cells, the run record and the conservation meters" src="docs/screenshots/hero-light.png">
 </picture>
 
 ## Method
@@ -21,7 +21,7 @@ Every particle attracts every other under Newtonian gravity with Plummer softeni
 
 Summing it directly takes $`N(N-1)`$ terms, so the cost grows as $`N^2`$.
 
-The tree method groups distant particles. The particles go into an octree built in Morton order, and each cell stands in for its contents as one source of mass at their centre of mass. For a particle at distance $`d`$ from a cell of side $`s`$, the cell is used whole when
+The tree method groups distant particles. The particles go into an octree built in Morton order, and each cell stands in for its contents as one source of mass at their centre of mass. For a particle at distance $`d`$ from the centre of mass of a cell of side $`s`$, the cell is used whole when
 
 ```math
 d > \frac{s}{\theta} + \delta
@@ -60,7 +60,7 @@ Medians of 5 repetitions on an Intel Core Ultra 5 238V (4 performance and 4 effi
 | 32768 | 686.3 | 102.6 |
 | 65536 | 2739.0 | 253.4 |
 
-The tree wins from N = 4096 and is 10.8 times faster at N = 65536. On that size the tree takes 896.8 ms on one thread and 253.4 ms on eight, a speedup of 3.5. The tree build is serial.
+The tree is ahead from N = 2048 (2.4 ms against 2.9 ms) and is 10.8 times faster at N = 65536. At that size the tree takes 896.8 ms on one thread and 253.4 ms on eight, a speedup of 3.5. The tree build is serial.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="results/speed-dark.png">
@@ -79,7 +79,7 @@ The speed costs accuracy, set by $`\theta`$. At N = 16384 the median relative fo
   <img alt="Median and 99th-percentile force error against the opening angle" src="results/force_error.png">
 </picture>
 
-Over 28.25 time units, about ten crossing times, at N = 4096 with $`\Delta t = 1/128`$, the energy error of the tree at $`\theta = 0.5`$ stays below 8.2e-5. Direct summation at the same settings stays below 3.0e-6. The tree's error does not depend on the timestep: the opening angle sets it, while direct summation's falls with the square of $`\Delta t`$.
+Over 28.25 time units, about ten crossing times, at N = 4096 with $`\Delta t = 1/128`$, the energy error of the tree at $`\theta = 0.5`$ peaks at 8.2e-5. Direct summation at the same settings peaks at 3.0e-6. The tree's error does not depend on the timestep: the opening angle sets it, while direct summation's falls with the square of $`\Delta t`$.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="results/energy_drift-dark.png">

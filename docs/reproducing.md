@@ -1,6 +1,6 @@
 # Reproducing the results
 
-Figures in the README are medians of 5 repetitions on an Intel Core Ultra 5
+Timing figures in the README are medians of 5 repetitions on an Intel Core Ultra 5
 238V (4 performance and 4 efficiency cores), g++ 16.2.0, `release` preset,
 Plummer sphere, softening 4/sqrt(N), theta 0.5, 8 threads. A tree evaluation
 includes building the tree. The data is in `results/`: `timing.json`,
