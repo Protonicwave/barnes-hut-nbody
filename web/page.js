@@ -229,7 +229,7 @@ function showCaption() {
   let html;
   if (settings.setup === "kepler") {
     html = "Two bodies, no tree.";
-  } else if (counts?.cells === 0) {
+  } else if (counts && settings.method === "direct") {
     html = `Marked particle: force summed from <b>${formatInteger(counts.particles)}</b> particles, one by one. No tree.`;
   } else if (counts) {
     html = `Marked particle: force summed from <b>${formatInteger(counts.cells)}</b> cells and ` +
