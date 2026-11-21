@@ -27,7 +27,7 @@ The tree method groups distant particles. The particles go into an octree built 
 d > \frac{s}{\theta} + \delta
 ```
 
-where $`\delta`$ is the distance between the cell's centre of mass and its geometric centre (Barnes 1994). With $`\delta = 0`$ this is the familiar $`s/d < \theta`$. Otherwise the cell is opened and its children are tested in turn, down to leaves of at most 4 particles, which are summed pairwise. The opening angle $`\theta`$ sets the trade: 0 opens every cell and reproduces the direct sum, and values above about 0.7 are not recommended. For a bounded, roughly uniform distribution the expected cost is $`O(N \log N)`$.
+where $`\delta`$ is the distance between the cell's centre of mass and its geometric centre (Barnes 1994). With $`\delta = 0`$ this is the familiar $`s/d \lt \theta`$. Otherwise the cell is opened and its children are tested in turn, down to leaves of at most 4 particles, which are summed pairwise. The opening angle $`\theta`$ sets the trade: 0 opens every cell and reproduces the direct sum, and values above about 0.7 are not recommended. For a bounded, roughly uniform distribution the expected cost is $`O(N \log N)`$.
 
 Time stepping is kick-drift-kick leapfrog with a fixed timestep $`\Delta t`$:
 
@@ -42,7 +42,7 @@ Time stepping is kick-drift-kick leapfrog with a fixed timestep $`\Delta t`$:
 The scheme is symplectic and second order. The total energy is
 
 ```math
-E = \sum_i \tfrac{1}{2} m_i v_i^2 \; - \sum_{i<j} \frac{m_i m_j}{\sqrt{r_{ij}^2 + \epsilon^2}}
+E = \sum_i \tfrac{1}{2} m_i v_i^2 \; - \sum_{i \lt j} \frac{m_i m_j}{\sqrt{r_{ij}^2 + \epsilon^2}}
 ```
 
 and the potential is always summed directly, whichever method computed the forces, so the tree's error is measured against an exact reference. The energy error reported below is $`\lvert E(t) - E_0 \rvert / \lvert E_0 \rvert`$.
