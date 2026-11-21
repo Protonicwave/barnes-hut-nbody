@@ -121,8 +121,8 @@ at http://127.0.0.1:8000/ with them (the batch file also opens the page, and
 needs the Wasm builds above in place), and
 `--no-isolation` leaves them out, which shows the page fall back to the
 single-threaded build with a banner saying so. In headless Chrome on the
-development machine the page loads in 256 ms to its largest paint on the
-single-threaded build, with no layout shift, and its own JavaScript is 15 KiB
+development machine the page loads in 0.6 s to its largest paint on the
+single-threaded build, with no layout shift, and its own JavaScript is 23 KiB
 compressed. `web/test/page_budget.mjs` measures those figures and the time of
 one viewport draw at 8192 particles, prints each beside its budget and exits 1
 when any is over:
