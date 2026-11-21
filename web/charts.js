@@ -222,7 +222,7 @@ export function figureCaptions(data) {
       `Relative error of the tree force against direct summation, N = ${formatInteger(data.forceError.count)}, ε = 4/√N. ` +
       `Between θ = ${force[0].theta} and θ = ${force.at(-1).theta} the median error grows roughly as θ to the power ${fittedExponent(force, "median").toFixed(1)}.`,
     drift:
-      `N = ${formatInteger(driftCount)}, Δt = 1/${Math.round(1 / timestep)}, ε = 4/√N, ${formatInteger(endTime / timestep)} steps, tree at θ = 0.3 to 1. ` +
+      `N = ${formatInteger(driftCount)}, Δt = 1/${Math.round(1 / timestep)}, ε = 4/√N, ${formatInteger(endTime / timestep)} steps, tree at θ = ${thetas.join(", ")}. ` +
       "Direct summation at the same step shows integration error alone. The gap above it is the tree.",
   };
 }

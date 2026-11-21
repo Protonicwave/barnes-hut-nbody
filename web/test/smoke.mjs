@@ -453,6 +453,7 @@ describe("figureCaptions", () => {
     assert.ok(captions.force.includes("N = 16,384"), captions.force);
     assert.ok(captions.drift.includes("N = 4,096"), captions.drift);
     assert.ok(captions.drift.includes("Δt = 1/128"), captions.drift);
+    assert.ok(captions.drift.includes("θ = 0.3, 0.5, 0.7, 1"), captions.drift);
     assert.ok(!Object.values(captions).some((text) => text.includes("repetitions")));
   });
 });
