@@ -16,6 +16,7 @@ PLAIN_MATHS = re.compile(r"\$([^$\n]+)\$")
 LINK_TARGET = re.compile(r"\]\(([^)\s]+)")
 ATTRIBUTE_TARGET = re.compile(r"""\b(?:src|href|srcset)\s*=\s*["']([^"']+)["']""")
 TABLE_HEADER = re.compile(r"^\|\s*N\s*\|\s*direct \(ms\)\s*\|\s*tree \(ms\)\s*\|\s*$", re.MULTILINE)
+MATH_FENCE = re.compile(r"^```math\n(.*?)^```", re.DOTALL | re.MULTILINE)
 EXTERNAL = ("http://", "https://", "mailto:", "#")
 
 
@@ -43,6 +44,12 @@ def fragile_maths(text: str) -> list[str]:
     """Plain inline maths holding an underscore or asterisk, which Markdown reads as emphasis."""
     markup = CODE_SPAN.sub("", BACKTICK_MATHS.sub("", prose(text)))
     return [m for m in PLAIN_MATHS.findall(markup) if "_" in m or "*" in m]
+
+
+def raw_angle_brackets(text: str) -> list[str]:
+    """Maths spans holding a literal `<`, which GitHub reads as the start of an HTML tag."""
+    spans = BACKTICK_MATHS.findall(text) + MATH_FENCE.findall(text)
+    return [span for span in spans if "<" in span]
 
 
 def results_table(text: str) -> list[tuple[str, str, str]]:
@@ -85,6 +92,16 @@ def test_every_relative_target_exists(document: Path) -> None:
 @pytest.mark.parametrize("document", DOCUMENTS, ids=lambda path: path.name)
 def test_inline_maths_avoids_emphasis_characters(document: Path) -> None:
     assert fragile_maths(document.read_text(encoding="utf-8")) == []
+
+
+@pytest.mark.parametrize("document", DOCUMENTS, ids=lambda path: path.name)
+def test_maths_avoids_literal_angle_brackets(document: Path) -> None:
+    assert raw_angle_brackets(document.read_text(encoding="utf-8")) == []
+
+
+def test_angle_brackets_in_maths_are_reported() -> None:
+    text = "ok $`a \\lt b`$ bad $`s/d < x`$\n```math\n\\sum_{i<j}\n```\n"
+    assert len(raw_angle_brackets(text)) == 2
 
 
 def test_readme_table_matches_timing_results() -> None:
