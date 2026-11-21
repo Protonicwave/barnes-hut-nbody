@@ -186,10 +186,25 @@ eight minutes.
 
 The figures below come from those files:
 
-![Force evaluation time against N](results/speed.png)
-![Tree speedup over one thread](results/scaling.png)
-![Force error against the opening angle](results/force_error.png)
-![Energy error over time](results/energy_drift.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="results/speed-dark.png">
+  <img alt="Force evaluation time against N" src="results/speed.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="results/scaling-dark.png">
+  <img alt="Tree speedup over one thread" src="results/scaling.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="results/force_error-dark.png">
+  <img alt="Force error against the opening angle" src="results/force_error.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="results/energy_drift-dark.png">
+  <img alt="Energy error over time" src="results/energy_drift.png">
+</picture>
 
 The tree's energy error does not depend on the timestep: it is set by the
 opening angle, while direct summation's falls with the square of dt. Draw them
