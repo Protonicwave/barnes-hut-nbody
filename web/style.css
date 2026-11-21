@@ -202,7 +202,7 @@ section[id] { scroll-margin-top: 72px; }
 .rail fieldset.controls { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: var(--sp-4); }
 .rail fieldset[disabled] { opacity: 0.5; }
 .group { border-top: 1px solid var(--rule); padding-top: 18px; display: grid; gap: var(--sp-3); }
-.group > h3 { font-family: var(--font-text); font-size: 0.9375rem; font-weight: 600; letter-spacing: 0; }
+.group > h3, .group-head h3 { font-family: var(--font-text); font-size: 0.9375rem; font-weight: 600; letter-spacing: 0; }
 .field { display: grid; gap: 4px; }
 .field-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); }
 .field label, .field .label { font-size: 0.9375rem; color: var(--ink-2); }
@@ -337,3 +337,24 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 .overlay-state .detail:empty { display: none; }
 [hidden] { display: none !important; }
 .overlay-state .btn { color: var(--ink); }
+
+/* Run record and conservation meters */
+.group-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); }
+.group-head .copy { position: static; }
+.record {
+  margin: 0; padding: 10px 12px; background: var(--sunken); border: 1px solid var(--rule); border-radius: var(--r-s);
+  font-size: 0.75rem; line-height: 1.55; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.meters { display: grid; gap: 12px; }
+.meter { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: baseline; }
+.meter-name { font-size: 0.9375rem; color: var(--ink-2); }
+.meter b { font-size: 0.9375rem; font-weight: 600; text-align: right; }
+.meter-track {
+  grid-column: 1 / -1; position: relative; height: 10px;
+  background:
+    repeating-linear-gradient(90deg, var(--rule-strong) 0 1px, transparent 1px 20%) left bottom / 100% 5px no-repeat,
+    linear-gradient(var(--rule), var(--rule)) left bottom / 100% 1px no-repeat;
+}
+.meter-track::before { content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: var(--w, 0%); background: var(--tree); }
+.meter-track::after { content: ""; position: absolute; bottom: 0; left: var(--w, 0%); width: 2px; height: 10px; background: var(--ink); transform: translateX(-1px); }
+.decades { display: flex; justify-content: space-between; font: 400 0.6875rem var(--font-mono); color: var(--ink-3); }

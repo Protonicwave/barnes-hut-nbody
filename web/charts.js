@@ -19,6 +19,16 @@ export function scientific(x) {
 export const formatMilliseconds = (x) =>
   `${x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1) : x.toFixed(2)} ms`;
 
+// Where a value sits on a log scale from 10^lowDecade to 10^highDecade, from 0
+// to 1. Zero and anything below the scale sit at 0, anything above at 1.
+export function decadeFraction(value, lowDecade, highDecade) {
+  if (!(value > 0)) {
+    return 0;
+  }
+  const fraction = (Math.log10(value) - lowDecade) / (highDecade - lowDecade);
+  return Math.min(1, Math.max(0, fraction));
+}
+
 const ENERGY = { height: 160, margin: { left: 44, right: 8, top: 8, bottom: 22 }, lowDecade: -7, highDecade: -1 };
 const REFERENCE_DRIFT = 1e-3;
 const MAX_TIME_TICKS = 6;
@@ -39,10 +49,7 @@ export function drawEnergy(svg, samples, time, method) {
   const tMin = samples.length > 0 ? samples[0][0] : 0;
   const tMax = Math.max(time, tMin + 4);
   const span = tMax - tMin;
-  const y = (e) => {
-    const decade = Math.min(highDecade, Math.max(lowDecade, Math.log10(e)));
-    return m.top + plotHeight * (1 - (decade - lowDecade) / (highDecade - lowDecade));
-  };
+  const y = (e) => m.top + plotHeight * (1 - decadeFraction(e, lowDecade, highDecade));
   const x = (t) => m.left + (plotWidth * (t - tMin)) / span;
   let markup = "";
   for (let decade = lowDecade; decade <= highDecade; decade += 2) {

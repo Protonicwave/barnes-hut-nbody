@@ -85,6 +85,28 @@
         <span>This page is not cross-origin isolated, so the browser withholds WebAssembly threads. The result is the same, only slower. <a href="#use">See the two headers it needs.</a></span>
       </div>
 
+      <div class="group">
+        <div class="group-head">
+          <h3>Run record</h3>
+          <button class="copy" type="button" data-copy="record">Copy</button>
+        </div>
+        <pre class="record" id="record" tabindex="0" aria-label="Python call that repeats this run"></pre>
+      </div>
+
+      <div class="group">
+        <div class="group-head">
+          <h3>Conservation</h3>
+          <span class="fine">log scale, 10⁻⁶ to 10⁻¹</span>
+        </div>
+        <div class="meters">
+          <div class="meter"><span class="meter-name">Relative energy error</span><b class="num" id="mEnergy">0</b><span class="meter-track" id="trEnergy" aria-hidden="true"></span></div>
+          <div class="meter"><span class="meter-name">Momentum change</span><b class="num" id="mMomentum">0</b><span class="meter-track" id="trMomentum" aria-hidden="true"></span></div>
+          <div class="meter"><span class="meter-name">Centre of mass shift</span><b class="num" id="mCentre">0</b><span class="meter-track" id="trCentre" aria-hidden="true"></span></div>
+        </div>
+        <div class="decades" aria-hidden="true"><span>10⁻⁶</span><span>10⁻⁵</span><span>10⁻⁴</span><span>10⁻³</span><span>10⁻²</span><span>10⁻¹</span></div>
+        <p class="fine">Each reading is the change since the start of the run, or since the last restart or method change. Units with G = M = 1.</p>
+      </div>
+
       <fieldset class="controls" id="controls" disabled>
         <legend class="visually-hidden">Simulation controls</legend>
 

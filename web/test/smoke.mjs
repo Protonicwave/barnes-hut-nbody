@@ -17,6 +17,8 @@ import {
   particleCount,
   withChange,
 } from "../settings.js";
+import { decadeFraction } from "../charts.js";
+import { runRecord } from "../record.js";
 import { defaultMarkedParticle, openedLeaves, openingTest, walkCounts } from "../scope.js";
 import createThreaded from "../wasm/threads/nbody.js";
 import createSingle from "../wasm/single/nbody.js";
@@ -326,6 +328,111 @@ describe("page controls reach the simulation with the value their label shows", 
     assert.equal(controlState(withChange(SMALL, "theta", 0.7)).thetaWarning, false);
     const direct = withChange(withChange(SMALL, "theta", 0.9), "method", "direct");
     assert.equal(controlState(direct).thetaWarning, false);
+  });
+});
+
+describe("conservation and the force change time in a frame", () => {
+  const direct = withChange(SMALL, "method", "direct");
+
+  it("conservation is all zero on the first frame", () => {
+    const runner = new Runner(single, SMALL);
+    assert.deepEqual(frame(runner, { steps: 0 }).conservation, { energy: 0, momentum: 0, centre: 0 });
+    runner.close();
+  });
+
+  it("direct summation changes the momentum by under 1e-12, and energy is the last sample", () => {
+    const runner = new Runner(single, direct);
+    const message = frame(runner, { steps: 32 });
+    const { conservation } = message;
+    assert.ok(conservation.momentum < 1e-12, `momentum ${conservation.momentum}`);
+    assert.ok(conservation.centre < 1e-12, `centre ${conservation.centre}`);
+    assert.equal(message.samples.length, 2);
+    assert.equal(conservation.energy, message.samples.at(-1)[1]);
+    assert.ok(conservation.energy > 0);
+    runner.close();
+  });
+
+  it("a method change measures from the current state, so every reading is zero again", () => {
+    const runner = new Runner(single, SMALL);
+    assert.ok(frame(runner, { steps: 32 }).conservation.energy > 0);
+    runner.change(direct);
+    assert.deepEqual(frame(runner, { steps: 0 }).conservation, { energy: 0, momentum: 0, centre: 0 });
+    runner.close();
+  });
+
+  it("forceChangedAt is null after create and restart, the time after theta or method, and unmoved by threads", () => {
+    const runner = new Runner(threaded, SMALL);
+    frame(runner, { steps: 4 });
+    assert.equal(frame(runner, { steps: 0 }).forceChangedAt, null);
+    runner.change(withChange(SMALL, "threads", 2));
+    assert.equal(frame(runner, { steps: 0 }).forceChangedAt, null);
+    const tuned = withChange(SMALL, "theta", 0.3);
+    runner.change(tuned);
+    const at = frame(runner, { steps: 0 }).forceChangedAt;
+    assert.ok(Math.abs(at - 4 / 128) < 1e-12, `${at}`);
+    runner.change(withChange(tuned, "threads", 4));
+    assert.equal(frame(runner, { steps: 0 }).forceChangedAt, at);
+    frame(runner, { steps: 4 });
+    runner.change(withChange(tuned, "method", "direct"));
+    assert.ok(frame(runner, { steps: 0 }).forceChangedAt > at);
+    runner.change(withChange(tuned, "run", 1));
+    assert.equal(frame(runner, { steps: 0 }).forceChangedAt, null);
+    runner.close();
+  });
+});
+
+describe("the run record", () => {
+  const DEFAULT_RECORD = [
+    "import numpy as np",
+    "import barnes_hut as bh",
+    "",
+    "positions, velocities, masses = bh.plummer_sphere(1024, seed=1)",
+    "simulation = bh.Simulation(",
+    "    positions, velocities, masses,",
+    "    dt=1 / 128, softening=4 / np.sqrt(1024),",
+    '    method="tree", theta=0.5, threads=8,',
+    ")",
+    "start = simulation.total_energy()",
+    "simulation.step(1600)",
+    "print(abs(simulation.total_energy() - start) / abs(start))",
+  ].join("\n");
+
+  it("is the README call for the default settings at t = 12.5", () => {
+    assert.equal(runRecord(DEFAULT_SETTINGS, 12.5, null), DEFAULT_RECORD);
+  });
+
+  it("builds a cold collapse with uniform_sphere and carries every setting", () => {
+    const settings = { ...DEFAULT_SETTINGS, setup: "collapse", countIndex: 4, seed: 7, softeningScale: 2, timestepIndex: 2, method: "direct", theta: 0.7, threads: 2 };
+    const record = runRecord(settings, 1, null);
+    assert.match(record, /bh\.uniform_sphere\(4096, seed=7\)/);
+    assert.match(record, /dt=1 \/ 64, softening=2 \/ np\.sqrt\(4096\)/);
+    assert.match(record, /method="direct", theta=0\.7, threads=2/);
+    assert.match(record, /simulation\.step\(64\)/);
+  });
+
+  it("builds the Kepler binary with no softening and no count or seed", () => {
+    const record = runRecord({ ...DEFAULT_SETTINGS, setup: "kepler" }, 0.5, null);
+    assert.match(record, /bh\.kepler_binary\(eccentricity=0\.5, semi_major_axis=1\.0\)/);
+    assert.match(record, /softening=0,/);
+    assert.doesNotMatch(record, /seed|sqrt/);
+  });
+
+  it("notes a method or theta change only when the force was changed", () => {
+    const note = "# method or theta changed at t = 3.25; this call runs the current settings from t = 0";
+    assert.ok(!runRecord(DEFAULT_SETTINGS, 12.5, null).includes("changed at"));
+    const record = runRecord(DEFAULT_SETTINGS, 12.5, 3.25);
+    assert.equal(record, `${note}\n${DEFAULT_RECORD}`);
+  });
+});
+
+describe("decadeFraction", () => {
+  it("places a value on a log scale, clamped to the ends", () => {
+    assert.equal(decadeFraction(1e-6, -6, -1), 0);
+    assert.ok(Math.abs(decadeFraction(1e-4, -6, -1) - 0.4) < 1e-12);
+    assert.equal(decadeFraction(1e-1, -6, -1), 1);
+    assert.equal(decadeFraction(0, -6, -1), 0);
+    assert.equal(decadeFraction(1e-9, -6, -1), 0);
+    assert.equal(decadeFraction(1, -6, -1), 1);
   });
 });
 

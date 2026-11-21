@@ -2,7 +2,7 @@
 // results figures. The simulation itself runs in worker.js, which this file
 // asks for one frame at a time.
 
-import { drawEnergy, drawFigures, formatInteger, formatMilliseconds, scientific } from "./charts.js";
+import { decadeFraction, drawEnergy, drawFigures, formatInteger, formatMilliseconds, scientific } from "./charts.js";
 import {
   PARTICLE_COUNTS,
   changeKind,
@@ -12,6 +12,7 @@ import {
   moduleState,
   withChange,
 } from "./settings.js";
+import { runRecord } from "./record.js";
 import { defaultMarkedParticle, walkCounts } from "./scope.js";
 import { Viewport } from "./viewport.js";
 
@@ -25,6 +26,15 @@ const MAX_TRAILED_PARTICLES = 8;
 // Frames between updates of the read-outs and the energy strip while running.
 const READOUT_INTERVAL_FRAMES = 6;
 const COPIED_MESSAGE_MS = 1600;
+// The conservation meters share one log scale, 1e-6 to 1e-1.
+const METER_LOW_DECADE = -6;
+const METER_HIGH_DECADE = -1;
+const METERS = [
+  { key: "energy", value: "#mEnergy", track: "#trEnergy" },
+  { key: "momentum", value: "#mMomentum", track: "#trMomentum" },
+  { key: "centre", value: "#mCentre", track: "#trCentre" },
+];
+const NO_CONSERVATION = { energy: 0, momentum: 0, centre: 0 };
 
 const SETUP_HINTS = {
   plummer: "Virial units, G = M = 1. A cluster in equilibrium.",
@@ -107,6 +117,7 @@ function syncControls() {
   $("#cellsToggle").setAttribute("aria-pressed", String(view.showCells));
   setText("#playBtn", view.running ? "Pause" : "Play");
   setText("#seedNote", text.seed);
+  showRecord();
 
   $("#stateLoading").dataset.show = String(module.showLoading);
   $("#stateFailed").dataset.show = String(module.showFailed);
@@ -136,6 +147,7 @@ function change(key, value) {
   }
   measurement = null;
   showMeasurement();
+  showMeters();
   showCaption();
   needsFrame = true;
   syncControls();
@@ -267,7 +279,21 @@ function showMeasurement() {
   setText("#interDirect", formatInteger(measurement.count - 1));
 }
 
+function showRecord() {
+  setText("#record", runRecord(settings, latest?.time ?? 0, latest?.forceChangedAt ?? null));
+}
+
+function showMeters() {
+  const conservation = latest?.conservation ?? NO_CONSERVATION;
+  for (const { key, value, track } of METERS) {
+    setText(value, scientific(conservation[key]));
+    $(track).style.setProperty("--w", `${100 * decadeFraction(conservation[key], METER_LOW_DECADE, METER_HIGH_DECADE)}%`);
+  }
+}
+
 function showReadouts() {
+  showRecord();
+  showMeters();
   setText("#timeVal", latest.time.toFixed(2));
   setText("#clockValue", latest.time.toFixed(2));
   const last = samples.at(-1);
