@@ -137,6 +137,24 @@ describe("both builds", () => {
       simulation.delete();
     });
 
+    it(`${name}: reports the centre of mass of each accepted cell, which passes the opening test`, () => {
+      const theta = 0.5;
+      const simulation = plummer(module);
+      const { accepted, acceptedCentresOfMass } = simulation.walkTrace(3);
+      assert.ok(accepted.length > 0);
+      assert.equal(acceptedCentresOfMass.length, (accepted.length / 5) * 3);
+      const position = simulation.positions().slice(9, 12);
+      for (let cell = 0; cell < accepted.length / 5; cell++) {
+        const edge = accepted[5 * cell + 3];
+        const centre = accepted.slice(5 * cell, 5 * cell + 3);
+        const mass = acceptedCentresOfMass.slice(3 * cell, 3 * cell + 3);
+        const distance = Math.hypot(...position.map((x, axis) => x - mass[axis]));
+        const offset = Math.hypot(...mass.map((x, axis) => x - centre[axis]));
+        assert.ok(distance * theta > edge + theta * offset, `cell ${cell} fails the opening test`);
+      }
+      simulation.delete();
+    });
+
     it(`${name}: evaluates forces by either method for timing`, () => {
       const simulation = plummer(module);
       simulation.evaluateForces("direct");
