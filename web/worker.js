@@ -5,12 +5,10 @@
 // ready, "ready" once a simulation exists, one "frame" per request, and
 // "failed" with a message for any error.
 // In: { type: "start", settings } after "loaded", then
-//   { type: "settings", settings, generation } and { type: "frame", steps, probe, wantCells }.
+//   { type: "settings", settings, generation } and { type: "frame", steps, speed, probe, wantCells }.
 
 import { Runner } from "./runner.js";
-
-// Longest a frame spends stepping, so the page keeps its frame rate.
-const FRAME_BUDGET_MS = 12;
+import { frameBudgetMs } from "./settings.js";
 
 // Threaded builds need cross-origin isolation for shared memory.
 const variant = self.crossOriginIsolated ? "threads" : "single";
@@ -40,7 +38,7 @@ onmessage = ({ data }) => {
       generation = data.generation;
       runner.change(data.settings);
     } else if (data.type === "frame") {
-      const { message, transfer } = runner.frame({ ...data, budgetMs: FRAME_BUDGET_MS });
+      const { message, transfer } = runner.frame({ ...data, budgetMs: frameBudgetMs(data.speed) });
       postMessage({ ...message, generation }, transfer);
     }
   } catch (error) {

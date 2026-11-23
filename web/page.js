@@ -302,7 +302,30 @@ function showReadouts() {
   showRecord();
   showMeters();
   setText("#clockValue", latest.time.toFixed(2));
-  setText("#stepValue", formatInteger(stepsTaken(settings, latest.time)));
+// Achieved steps per second: the steps taken over the last RATE_WINDOW_MS of
+// running frames. Pausing or a restart starts the window again.
+const RATE_WINDOW_MS = 1000;
+let rateSamples = [];
+
+function stepRate(steps, now) {
+  if (!view.running || rateSamples.length > 0 && steps < rateSamples.at(-1).steps) {
+    rateSamples = [];
+  }
+  if (!view.running) {
+    return null;
+  }
+  rateSamples.push({ steps, now });
+  while (rateSamples.length > 1 && now - rateSamples[0].now > RATE_WINDOW_MS) {
+    rateSamples.shift();
+  }
+  const first = rateSamples[0];
+  return now > first.now ? (steps - first.steps) / ((now - first.now) / 1000) : null;
+}
+
+  const steps = stepsTaken(settings, latest.time);
+  setText("#stepValue", formatInteger(steps));
+  const rate = stepRate(steps, performance.now());
+  setText("#rateValue", rate === null ? "0" : formatInteger(Math.round(rate)));
   const last = samples.at(-1);
   setText("#eNow", last ? scientific(last[1]) : "0");
   showMeasurement();
@@ -399,6 +422,7 @@ function requestFrames() {
     wantCells: view.showCells && settings.method === "tree",
     resendCells: cells === null,
   });
+    speed: view.speed,
 }
 
 // Results

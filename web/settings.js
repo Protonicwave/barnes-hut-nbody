@@ -57,6 +57,11 @@ export const softening = (settings) =>
 
 export const timestep = (settings) => TIMESTEPS[settings.timestepIndex];
 
+// Longest a frame spends stepping, by the page's steps per frame: a faster
+// setting may cost frame rate, which is what asking for it means.
+export const FRAME_BUDGET_MS_BY_SPEED = { 1: 12, 4: 24, 16: 48 };
+export const frameBudgetMs = (speed) => FRAME_BUDGET_MS_BY_SPEED[speed];
+
 // Steps since the run started. A timestep change restarts the run, so the
 // time is always a whole number of the current timestep.
 export const stepsTaken = (settings, time) => Math.round(time / timestep(settings));

@@ -24,6 +24,7 @@ import { decadeFraction, figureCaptions } from "../charts.js";
 import { runRecord } from "../record.js";
 import { defaultMarkedParticle, openedLeaves, openingTest, walkCounts } from "../scope.js";
 import { visibleCells } from "../scope.js";
+import { frameBudgetMs } from "../settings.js";
 import createThreaded from "../wasm/threads/nbody.js";
 import createSingle from "../wasm/single/nbody.js";
 
@@ -728,3 +729,5 @@ describe("the scope's claims about one particle's walk", () => {
     runner.close();
   });
 });
+
+
