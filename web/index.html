@@ -174,14 +174,15 @@
           <div class="bar-row" data-kind="tree"><span>Tree</span><span class="track"><span class="fill" style="width:20%"></span></span><span class="v num" id="tTree">…</span></div>
           <div class="bar-row" data-kind="direct"><span>Direct</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="v num" id="tDirect">…</span></div>
         </div>
-        <div class="big"><b class="num" id="speedup">…</b><span>faster than direct, per force evaluation</span></div>
-        <dl class="pairs">
+        <p class="fine" id="measureNone" hidden>Two bodies: nothing to compare</p>
+        <div class="big" id="speedupRow"><b class="num" id="speedup">…</b><span>faster than direct, per force evaluation</span></div>
+        <dl class="pairs" id="measurePairs">
           <dt>Force error, median</dt><dd id="errMed">…</dd>
           <dt>Force error, 99th percentile</dt><dd id="errP99">…</dd>
           <dt>Interactions per particle</dt><dd id="inter">…</dd>
           <dt>Direct would use</dt><dd id="interDirect">…</dd>
         </dl>
-        <p class="fine">Timed on the current positions every few seconds, with the tree at the θ set. Error is against direct summation at the same ε.</p>
+        <p class="fine" id="measureFine">Timed on the current positions every few seconds, with the tree at the θ set. Error is against direct summation at the same ε.</p>
       </div>
     </div>
   </section>

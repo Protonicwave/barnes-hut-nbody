@@ -9,6 +9,7 @@ import {
   SPEED_BANDS,
   VIEW_RADIUS,
   changeKind,
+  effectiveMethod,
   energyInterval,
   isEnergyBaselineReset,
   particleCount,
@@ -68,7 +69,7 @@ export class Runner {
       return kind;
     }
     if (kind === "method" || kind === "tune") {
-      this.#simulation.setForceSettings(next.method, next.theta, next.threads);
+      this.#simulation.setForceSettings(effectiveMethod(next), next.theta, next.threads);
       this.#measureAgain = true;
     }
     if (forceChanged) {
@@ -117,7 +118,7 @@ export class Runner {
   #create() {
     const s = this.#settings;
     this.#simulation = this.#module.Simulation.create(
-      s.setup, particleCount(s), s.seed, s.method, s.theta, softening(s), timestep(s), s.threads);
+      s.setup, particleCount(s), s.seed, effectiveMethod(s), s.theta, softening(s), timestep(s), s.threads);
     this.#baseline = this.#simulation.initialEnergy();
     this.#startConservation();
     this.#forceChangedAt = null;

@@ -55,6 +55,10 @@ export const particleCount = (settings) =>
 export const softening = (settings) =>
   settings.setup === "kepler" ? 0 : settings.softeningScale / Math.sqrt(particleCount(settings));
 
+// Two bodies have nothing for a tree to group, so a binary always runs by
+// direct summation whatever the method control says.
+export const effectiveMethod = (settings) => (settings.setup === "kepler" ? "direct" : settings.method);
+
 export const timestep = (settings) => TIMESTEPS[settings.timestepIndex];
 
 // Longest a frame spends stepping, by the page's steps per frame: a faster
@@ -112,10 +116,12 @@ export function labels(settings) {
 // Which controls the settings leave out of use.
 export function controlState(settings) {
   const kepler = settings.setup === "kepler";
-  const direct = settings.method === "direct";
+  const direct = effectiveMethod(settings) === "direct";
   return {
     countDisabled: kepler,
     softeningDisabled: kepler,
+    methodDisabled: kepler,
+    seedDisabled: kepler,
     thetaDisabled: direct,
     thetaWarning: !direct && settings.theta > THETA_WARNING_ABOVE,
     cellsDisabled: direct,

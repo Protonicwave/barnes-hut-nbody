@@ -25,7 +25,7 @@ import { runRecord } from "../record.js";
 import { defaultMarkedParticle, openedLeaves, openingTest, walkCounts } from "../scope.js";
 import { visibleCells } from "../scope.js";
 import { testText } from "../scope.js";
-import { frameBudgetMs } from "../settings.js";
+import { effectiveMethod, frameBudgetMs } from "../settings.js";
 import createThreaded from "../wasm/threads/nbody.js";
 import createSingle from "../wasm/single/nbody.js";
 
@@ -336,6 +336,28 @@ describe("page controls reach the simulation with the value their label shows", 
     assert.equal(message.cells, null);
     assert.equal(message.probe, null);
     runner.close();
+  });
+
+  it("the Kepler setup runs by direct summation and disables the controls that would not apply", () => {
+    const kepler = withChange(SMALL, "setup", "kepler");
+    assert.equal(effectiveMethod(kepler), "direct");
+    assert.equal(effectiveMethod(SMALL), "tree");
+    const state = controlState(kepler);
+    assert.deepEqual([state.thetaDisabled, state.methodDisabled, state.seedDisabled], [true, true, true]);
+    assert.deepEqual(
+      [controlState(SMALL).thetaDisabled, controlState(SMALL).methodDisabled, controlState(SMALL).seedDisabled],
+      [false, false, false]);
+    const module = recording(single);
+    const runner = new Runner(module, SMALL);
+    runner.change(kepler);
+    assert.equal(lastCall(module.calls, "create")[4], "direct");
+    runner.change(withChange(kepler, "method", "direct"));
+    runner.change(withChange(kepler, "theta", 0.7));
+    assert.equal(lastCall(module.calls, "setForceSettings")[1], "direct");
+    runner.close();
+    const record = runRecord(kepler, 0.5, null);
+    assert.match(record, /method="direct", threads=1,/);
+    assert.doesNotMatch(record, /theta/);
   });
 
   it("Whole tree is disabled under direct summation and hidden only for a binary", () => {
