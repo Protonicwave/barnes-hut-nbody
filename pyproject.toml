@@ -22,7 +22,7 @@ Source = "https://github.com/Protonicwave/barnes-hut-nbody"
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
-plot = ["matplotlib>=3.8"]
+plot = ["matplotlib>=3.8", "pillow>=10"]
 
 [tool.scikit-build]
 # OpenMP_RUNTIME_MSVC, which selects /openmp:llvm, is read from CMake 3.30.
@@ -58,7 +58,7 @@ target-version = "py310"
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "S", "PT", "N", "C90", "PLR"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["barnes_hut", "plot_results", "serve", "export_page_data", "check_budgets", "check_wasm_budgets"]
+known-first-party = ["barnes_hut", "plot_results", "serve", "export_page_data", "check_budgets", "check_wasm_budgets", "encode_display_clip"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
