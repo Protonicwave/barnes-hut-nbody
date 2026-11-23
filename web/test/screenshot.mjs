@@ -52,11 +52,11 @@ async function requireWasmBuilds() {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// The full-width band from the top of the page title to the foot of the
-// viewport, in page coordinates.
+// The full-width band from the top of the header to the foot of the
+// instrument, in page coordinates.
 const CLIP_SCRIPT = `(() => {
-  const top = document.querySelector(".intro").getBoundingClientRect();
-  const foot = document.querySelector("#viewport").getBoundingClientRect();
+  const top = document.querySelector(".site-head").getBoundingClientRect();
+  const foot = document.querySelector("#simulator").getBoundingClientRect();
   return { x: 0, y: top.top + scrollY, width: document.documentElement.clientWidth, height: foot.bottom - top.top };
 })()`;
 

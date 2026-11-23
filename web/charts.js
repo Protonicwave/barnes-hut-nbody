@@ -29,7 +29,7 @@ export function decadeFraction(value, lowDecade, highDecade) {
   return Math.min(1, Math.max(0, fraction));
 }
 
-const ENERGY = { height: 160, margin: { left: 44, right: 8, top: 8, bottom: 22 }, lowDecade: -7, highDecade: -1 };
+const ENERGY = { height: 120, margin: { left: 44, right: 8, top: 8, bottom: 22 }, lowDecade: -7, highDecade: -1 };
 const REFERENCE_DRIFT = 1e-3;
 const MAX_TIME_TICKS = 6;
 

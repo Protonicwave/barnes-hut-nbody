@@ -1,8 +1,4 @@
-Source Serif 4, Source Sans 3 and Source Code Pro (latin subsets, variable) come from
-the @fontsource-variable packages at version 5.3.1. All three are licensed under
-the SIL Open Font License, Version 1.1, reproduced below.
-
-Google Inc.
+Copyright 2012 The B612 Project Authors (https://github.com/polarsys/b612)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

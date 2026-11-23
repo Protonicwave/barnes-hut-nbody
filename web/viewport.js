@@ -21,7 +21,7 @@ const MAJOR_TICK_PX = 9;
 const MINOR_TICK_PX = 4;
 const TICK_LABEL_INSET_PX = 13;
 const TICK_LABEL_MARGIN_UNITS = 0.3;
-const MONOSPACE = '"Source Code Pro", ui-monospace, Consolas, monospace';
+const MONOSPACE = 'ui-monospace, "Cascadia Mono", Consolas, monospace';
 
 const MARK_RADIUS_PX = 6;
 const MARK_TICK_INNER_PX = 7;

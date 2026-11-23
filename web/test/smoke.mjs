@@ -15,6 +15,7 @@ import {
   labels,
   moduleState,
   particleCount,
+  stepsTaken,
   withChange,
 } from "../settings.js";
 import { readFileSync } from "node:fs";
@@ -379,6 +380,20 @@ describe("conservation and the force change time in a frame", () => {
     runner.change(withChange(tuned, "run", 1));
     assert.equal(frame(runner, { steps: 0 }).forceChangedAt, null);
     runner.close();
+  });
+});
+
+describe("stepsTaken", () => {
+  it("is the time over the timestep, so 1,600 for the default settings at t = 12.5", () => {
+    assert.equal(stepsTaken(DEFAULT_SETTINGS, 12.5), 1600);
+  });
+
+  it("is zero at the start of a run", () => {
+    assert.equal(stepsTaken(DEFAULT_SETTINGS, 0), 0);
+  });
+
+  it("doubles when the timestep is halved", () => {
+    assert.equal(stepsTaken({ ...DEFAULT_SETTINGS, timestepIndex: 0 }, 12.5), 3200);
   });
 });
 
