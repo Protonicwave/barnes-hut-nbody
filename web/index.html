@@ -86,13 +86,15 @@
         </div>
         <div class="field">
           <div class="field-row"><label for="theta">Opening angle <span class="math">θ</span></label><output id="thetaOut" for="theta"></output></div>
-          <div class="range" style="--minor: 12.5%; --major: 25%"><span class="zone" aria-hidden="true"></span><span class="ruler" aria-hidden="true"></span><input type="range" id="theta" min="0.2" max="1" step="0.1" value="0.5"></div>
+          <span class="plain" id="thetaPlain">Shortcut strength</span>
+          <div class="range" style="--minor: 12.5%; --major: 25%"><span class="zone" aria-hidden="true"></span><span class="ruler" aria-hidden="true"></span><input type="range" id="theta" min="0.2" max="1" step="0.1" value="0.5" aria-describedby="thetaPlain"></div>
           <div class="ticks" aria-hidden="true"><span>0.2</span><span>0.4</span><span>0.6</span><span>0.8</span><span>1.0</span></div>
           <div class="hint" id="thetaHint"></div>
         </div>
         <div class="field">
           <div class="field-row"><span class="label" id="epsLabel">Softening <span class="math">ε</span></span><output id="epsOut"></output></div>
-          <div class="seg" role="radiogroup" aria-labelledby="epsLabel">
+          <span class="plain" id="epsPlain">Smoothing of close encounters</span>
+          <div class="seg" role="radiogroup" aria-labelledby="epsLabel" aria-describedby="epsPlain">
             <label><input type="radio" name="eps" value="1"><span>1/√N</span></label>
             <label><input type="radio" name="eps" value="2"><span>2/√N</span></label>
             <label><input type="radio" name="eps" value="4" checked><span>4/√N</span></label>
@@ -104,7 +106,8 @@
         <div class="stage-head"><span class="idx">3</span><h2>Integrator</h2><span class="aside">leapfrog</span></div>
         <div class="field">
           <span class="label" id="dtLabel">Timestep <span class="math">Δt</span></span>
-          <div class="seg" role="radiogroup" aria-labelledby="dtLabel">
+          <span class="plain" id="dtPlain">Length of each step</span>
+          <div class="seg" role="radiogroup" aria-labelledby="dtLabel" aria-describedby="dtPlain">
             <label><input type="radio" name="dt" value="0"><span>1/256</span></label>
             <label><input type="radio" name="dt" value="1" checked><span>1/128</span></label>
             <label><input type="radio" name="dt" value="2"><span>1/64</span></label>

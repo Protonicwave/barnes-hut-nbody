@@ -833,3 +833,13 @@ describe("the guided experiments", () => {
     }
   });
 });
+
+describe("plain names on the controls", () => {
+  it("name θ, ε and Δt in everyday words that each control is described by", () => {
+    const page = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    for (const [id, words] of [["thetaPlain", "Shortcut strength"], ["epsPlain", "Smoothing of close encounters"], ["dtPlain", "Length of each step"]]) {
+      assert.ok(page.includes(`id="${id}">${words}<`), id);
+      assert.ok(page.includes(`aria-describedby="${id}"`), id);
+    }
+  });
+});
