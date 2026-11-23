@@ -5,7 +5,7 @@
 // ready, "ready" once a simulation exists, one "frame" per request, and
 // "failed" with a message for any error.
 // In: { type: "start", settings } after "loaded", then
-//   { type: "settings", settings, generation } and { type: "frame", steps, speed, probe, wantCells }.
+//   { type: "settings", settings, generation } and { type: "frame", steps, probe, wantCells }.
 
 import { Runner } from "./runner.js";
 import { frameBudgetMs } from "./settings.js";
@@ -38,7 +38,7 @@ onmessage = ({ data }) => {
       generation = data.generation;
       runner.change(data.settings);
     } else if (data.type === "frame") {
-      const { message, transfer } = runner.frame({ ...data, budgetMs: frameBudgetMs(data.speed) });
+      const { message, transfer } = runner.frame({ ...data, budgetMs: frameBudgetMs(data.steps) });
       postMessage({ ...message, generation }, transfer);
     }
   } catch (error) {

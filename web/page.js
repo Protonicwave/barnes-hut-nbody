@@ -322,11 +322,12 @@ const RATE_WINDOW_MS = 1000;
 let rateSamples = [];
 
 function stepRate(steps, now) {
-  if (!view.running || rateSamples.length > 0 && steps < rateSamples.at(-1).steps) {
-    rateSamples = [];
-  }
   if (!view.running) {
+    rateSamples = [];
     return null;
+  }
+  if (rateSamples.length > 0 && steps < rateSamples.at(-1).steps) {
+    rateSamples = [];
   }
   rateSamples.push({ steps, now });
   while (rateSamples.length > 1 && now - rateSamples[0].now > RATE_WINDOW_MS) {
@@ -436,7 +437,6 @@ function requestFrames() {
   worker.postMessage({
     type: "frame",
     steps: view.running ? view.speed : 0,
-    speed: view.speed,
     probe: markedParticle(),
     wantCells: view.showCells && settings.method === "tree",
     resendCells: cells === null,

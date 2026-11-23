@@ -61,9 +61,9 @@ export const effectiveMethod = (settings) => (settings.setup === "kepler" ? "dir
 
 export const timestep = (settings) => TIMESTEPS[settings.timestepIndex];
 
-// Longest a frame spends stepping, by the page's steps per frame: a faster
+// Longest a frame spends stepping, by the steps a running frame asks for, which are the speed: a faster
 // setting may cost frame rate, which is what asking for it means.
-export const FRAME_BUDGET_MS_BY_SPEED = { 1: 12, 4: 24, 16: 48 };
+const FRAME_BUDGET_MS_BY_SPEED = { 1: 12, 4: 24, 16: 48 };
 export const frameBudgetMs = (speed) => FRAME_BUDGET_MS_BY_SPEED[speed];
 
 // Steps since the run started. A timestep change restarts the run, so the
