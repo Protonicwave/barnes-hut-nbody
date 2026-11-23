@@ -30,6 +30,7 @@ export function runRecord(settings, time, forceChangedAt) {
   if (forceChangedAt !== null) {
     lines.push(`# method or theta changed at t = ${forceChangedAt.toFixed(2)}; this call runs the current settings from t = 0`);
   }
+  const steps = stepsTaken(settings, time);
   lines.push(
     "import numpy as np",
     "import barnes_hut as bh",
@@ -40,8 +41,10 @@ export function runRecord(settings, time, forceChangedAt) {
     `    dt=${TIMESTEP_LABELS[settings.timestepIndex].replace("/", " / ")}, softening=${softeningText(settings)},`,
     `    method="${settings.method}", theta=${settings.theta}, threads=${settings.threads},`,
     ")",
-    "start = simulation.total_energy()",
-    `simulation.step(${stepsTaken(settings, time)})`,
-    "print(abs(simulation.total_energy() - start) / abs(start))");
+    "start = simulation.total_energy()");
+  if (steps > 0) {
+    lines.push(`simulation.step(${steps})`);
+  }
+  lines.push("print(abs(simulation.total_energy() - start) / abs(start))");
   return lines.join("\n");
 }

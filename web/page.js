@@ -302,10 +302,6 @@ function showMeters() {
   }
 }
 
-function showReadouts() {
-  showRecord();
-  showMeters();
-  setText("#clockValue", latest.time.toFixed(2));
 // Achieved steps per second: the steps taken over the last RATE_WINDOW_MS of
 // running frames. Pausing or a restart starts the window again.
 const RATE_WINDOW_MS = 1000;
@@ -326,6 +322,10 @@ function stepRate(steps, now) {
   return now > first.now ? (steps - first.steps) / ((now - first.now) / 1000) : null;
 }
 
+function showReadouts() {
+  showRecord();
+  showMeters();
+  setText("#clockValue", latest.time.toFixed(2));
   const steps = stepsTaken(settings, latest.time);
   setText("#stepValue", formatInteger(steps));
   const rate = stepRate(steps, performance.now());
@@ -422,11 +422,11 @@ function requestFrames() {
   worker.postMessage({
     type: "frame",
     steps: view.running ? view.speed : 0,
+    speed: view.speed,
     probe: markedParticle(),
     wantCells: view.showCells && settings.method === "tree",
     resendCells: cells === null,
   });
-    speed: view.speed,
 }
 
 // Results

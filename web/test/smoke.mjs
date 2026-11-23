@@ -24,8 +24,8 @@ import { decadeFraction, figureCaptions } from "../charts.js";
 import { runRecord } from "../record.js";
 import { defaultMarkedParticle, openedLeaves, openingTest, walkCounts } from "../scope.js";
 import { visibleCells } from "../scope.js";
-import { frameBudgetMs } from "../settings.js";
 import { testText } from "../scope.js";
+import { frameBudgetMs } from "../settings.js";
 import createThreaded from "../wasm/threads/nbody.js";
 import createSingle from "../wasm/single/nbody.js";
 
@@ -731,10 +731,26 @@ describe("the scope's claims about one particle's walk", () => {
   });
 });
 
-
-
 describe("the frame budget scales with the speed", () => {
   it("gives 12, 24 and 48 ms at 1, 4 and 16 steps per frame", () => {
     assert.deepEqual([1, 4, 16].map(frameBudgetMs), [12, 24, 48]);
+  });
+});
+
+describe("the opening test label", () => {
+  it("uses the fewest decimals at which the two sides differ", () => {
+    assert.equal(testText({ ratio: 0.4996, theta: 0.5 }), "s/(d − δ) = 0.4996 < θ = 0.5000");
+    assert.equal(testText({ ratio: 0.48, theta: 0.5 }), "s/(d − δ) = 0.48 < θ = 0.50");
+  });
+
+  it("reads approximately equal on a tie", () => {
+    assert.equal(testText({ ratio: 0.5, theta: 0.5 }), "s/(d − δ) = 0.5000 ≈ θ = 0.5000");
+  });
+});
+
+describe("a run record with no steps", () => {
+  it("leaves the step call out at time 0 and keeps it afterwards", () => {
+    assert.ok(!runRecord(DEFAULT_SETTINGS, 0, null).includes("simulation.step"));
+    assert.ok(runRecord(DEFAULT_SETTINGS, 1, null).includes("simulation.step("));
   });
 });
