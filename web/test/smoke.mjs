@@ -509,6 +509,20 @@ describe("figureCaptions", () => {
     }
   });
 
+  it("names the core mix on the plates that depend on the machine", () => {
+    const mix = results.machine.coreMix;
+    assert.match(mix, /performance .*efficiency/);
+    for (const text of [captions.time, captions.threads, captions.wasm]) {
+      assert.ok(text.includes(mix), text);
+    }
+  });
+
+  it("numbers the figures on the page from 1 without a gap", () => {
+    const page = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    const numbers = [...page.matchAll(/<span class="fig-no">Fig\. (\d+)<\/span>/g)].map((m) => Number(m[1]));
+    assert.deepEqual(numbers, [1, 2, 3, 4]);
+  });
+
   it("gives the count of the force plate and states no repetition count", () => {
     assert.ok(captions.force.includes("N = 16,384"), captions.force);
     assert.ok(captions.drift.includes("N = 4,096"), captions.drift);
