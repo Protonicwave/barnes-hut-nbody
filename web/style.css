@@ -168,7 +168,7 @@ fieldset.col-panel { border: 0; margin: 0; }
    the glass behind them. */
 .hud-bl, .hud-br { bottom: 6px; padding: 2px 6px; background: var(--view-bg); }
 .hud-bl { left: 6px; white-space: pre; }
-.hud-br { right: 6px; text-align: right; max-width: 60%; }
+.hud-br { right: 6px; text-align: right; max-width: 60%; white-space: pre-line; }
 .instrument:not([data-module="ready"]) .running-only { visibility: hidden; }
 .scale-bar { display: inline-block; height: 5px; border: 1px solid var(--view-dim); border-top: 0; }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--view-ink); flex: none; }

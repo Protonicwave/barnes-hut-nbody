@@ -38,6 +38,18 @@ export function openingTest(accepted, centresOfMass, position, theta) {
   return { ...best, offset, ratio: best.edge / (best.distance - offset), theta };
 }
 
+const TEST_DECIMALS = [2, 3, 4];
+
+// The opening test as written on the glass, with the fewest decimals at which
+// its two sides differ. Two sides equal at the most decimals are "≈", so the
+// label never reads as a false inequality.
+export function testText({ ratio, theta }) {
+  const decimals = TEST_DECIMALS.find((places) => ratio.toFixed(places) !== theta.toFixed(places));
+  const relation = decimals === undefined ? "≈" : ratio < theta ? "<" : ">";
+  const places = decimals ?? TEST_DECIMALS.at(-1);
+  return `s/(d − δ) = ${ratio.toFixed(places)} ${relation} θ = ${theta.toFixed(places)}`;
+}
+
 // The cells of a treeCells array that show on a glass centred on the origin,
 // halfWidth by halfHeight in length units: those whose square overlaps it,
 // with an edge of at least minEdge, and one of each set of cells at the same

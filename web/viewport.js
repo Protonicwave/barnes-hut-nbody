@@ -26,8 +26,6 @@ const MONOSPACE = 'ui-monospace, "Cascadia Mono", Consolas, monospace';
 const MARK_RADIUS_PX = 6;
 const MARK_TICK_INNER_PX = 7;
 const MARK_TICK_OUTER_PX = 11;
-const TEST_LABEL_OFFSET_PX = 14;
-const TEST_LABEL_FLIP_MARGIN_PX = 150;
 
 const BAND_COLOURS = Array.from({ length: SPEED_BANDS }, (_, band) => {
   const u = band / (SPEED_BANDS - 1);
@@ -376,10 +374,6 @@ export class Viewport {
     context.arc(massX, massY, 3, 0, TAU);
     context.fill();
     this.#label("d", (x + massX) / 2 + 8, (y + massY) / 2 - 8, "left");
-
-    const flipped = x > this.#width - TEST_LABEL_FLIP_MARGIN_PX;
-    const text = `s/(d − δ) = ${test.ratio.toFixed(2)} < θ = ${test.theta.toFixed(2)}`;
-    this.#label(text, x + (flipped ? -TEST_LABEL_OFFSET_PX : TEST_LABEL_OFFSET_PX), y + 16, flipped ? "right" : "left");
   }
 
   // Text in the tree colour on a halo of the glass colour, so it reads over

@@ -14,7 +14,7 @@ import {
   withChange,
 } from "./settings.js";
 import { runRecord } from "./record.js";
-import { defaultMarkedParticle, walkCounts } from "./scope.js";
+import { defaultMarkedParticle, testText, walkCounts } from "./scope.js";
 import { Viewport } from "./viewport.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -242,6 +242,10 @@ function showCaption() {
     text = `Marked particle: ${formatInteger(counts.particles)} particles, one by one`;
   } else if (counts) {
     text = `Marked particle: ${formatInteger(counts.cells)} cells + ${formatInteger(counts.particles)} particles`;
+    if (latest.probe.test) {
+      text += `
+${testText(latest.probe.test)}`;
+    }
   } else {
     return;
   }

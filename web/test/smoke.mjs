@@ -25,6 +25,7 @@ import { runRecord } from "../record.js";
 import { defaultMarkedParticle, openedLeaves, openingTest, walkCounts } from "../scope.js";
 import { visibleCells } from "../scope.js";
 import { frameBudgetMs } from "../settings.js";
+import { testText } from "../scope.js";
 import createThreaded from "../wasm/threads/nbody.js";
 import createSingle from "../wasm/single/nbody.js";
 
@@ -731,3 +732,9 @@ describe("the scope's claims about one particle's walk", () => {
 });
 
 
+
+describe("the frame budget scales with the speed", () => {
+  it("gives 12, 24 and 48 ms at 1, 4 and 16 steps per frame", () => {
+    assert.deepEqual([1, 4, 16].map(frameBudgetMs), [12, 24, 48]);
+  });
+});
