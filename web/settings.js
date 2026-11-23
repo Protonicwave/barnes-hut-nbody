@@ -49,6 +49,10 @@ export const softening = (settings) =>
 
 export const timestep = (settings) => TIMESTEPS[settings.timestepIndex];
 
+// Steps since the run started. A timestep change restarts the run, so the
+// time is always a whole number of the current timestep.
+export const stepsTaken = (settings, time) => Math.round(time / timestep(settings));
+
 // What a change from one set of settings to another asks of the simulation:
 // "restart" builds new particles, "method" keeps them and starts a new energy
 // series, "tune" changes the opening angle or threads and keeps both, and
