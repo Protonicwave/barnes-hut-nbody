@@ -144,9 +144,7 @@ function syncControls() {
   $("#liveDot").dataset.live = status === "ready" && view.running ? "on" : "off";
 }
 
-// A control the visitor moves ends any experiment the guide started.
 function change(key, value) {
-  endExperiment();
   applySettings(withChange(settings, key, value));
 }
 
@@ -177,8 +175,10 @@ function applySettings(next) {
 
 // Guided experiments
 
+// An experiment stays marked until the next one starts: its watch line asks
+// the visitor to move controls, and doing so must not take the mark away.
 function runExperiment(experiment) {
-  endExperiment();
+  clearExperimentMarks();
   Object.assign(view, experiment.view);
   applySettings(experimentSettings(settings, experiment));
   $(`[data-experiment="${experiment.id}"]`).setAttribute("aria-pressed", "true");
@@ -191,7 +191,7 @@ function runExperiment(experiment) {
   }
 }
 
-function endExperiment() {
+function clearExperimentMarks() {
   $$("[data-experiment]").forEach((button) => button.setAttribute("aria-pressed", "false"));
   $$("[data-watched]").forEach((panel) => delete panel.dataset.watched);
 }
