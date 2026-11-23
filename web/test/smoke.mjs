@@ -133,7 +133,7 @@ describe("both builds", () => {
       for (let c = 4; c < cells.length; c += 5) depths.add(cells[c]);
       assert.deepEqual([...depths].sort(), [2, 3, 4]);
       assert.throws(() => simulation.treeCells(1), /depth.*got 1/);
-      assert.throws(() => simulation.treeCells(6), /depth.*got 6/);
+      assert.throws(() => simulation.treeCells(11), /depth.*got 11/);
 
       const trace = simulation.walkTrace(3);
       assert.ok(trace.interactions > 0 && trace.interactions < COUNT - 1);
