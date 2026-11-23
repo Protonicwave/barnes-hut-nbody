@@ -13,6 +13,7 @@ import {
   SOFTENING_SCALES,
   TIMESTEP_LABELS,
   VIEW_RADIUS,
+  changeKind,
   controlState,
   effectiveMethod,
   frameBudgetMs,
@@ -25,6 +26,7 @@ import {
 import { readFileSync } from "node:fs";
 import { decadeFraction, figureCaptions } from "../charts.js";
 import { runRecord } from "../record.js";
+import { EXPERIMENTS, experimentSettings } from "../guide.js";
 import { defaultMarkedParticle, openedLeaves, openingTest, testText, visibleCells, walkCounts } from "../scope.js";
 import createThreaded from "../wasm/threads/nbody.js";
 import createSingle from "../wasm/single/nbody.js";
@@ -789,5 +791,60 @@ describe("a run record with no steps", () => {
   it("leaves the step call out at time 0 and keeps it afterwards", () => {
     assert.ok(!runRecord(DEFAULT_SETTINGS, 0, null).includes("simulation.step"));
     assert.ok(runRecord(DEFAULT_SETTINGS, 1, null).includes("simulation.step("));
+  });
+});
+
+describe("the guided experiments", () => {
+  it("set only values the controls offer", () => {
+    for (const experiment of EXPERIMENTS) {
+      const next = experimentSettings(DEFAULT_SETTINGS, experiment);
+      assert.ok(next.countIndex >= 0 && next.countIndex < PARTICLE_COUNTS.length, experiment.id);
+      assert.ok(next.theta >= 0.2 && next.theta <= 1, experiment.id);
+      assert.equal(withChange(next, "theta", next.theta).theta, next.theta, experiment.id);
+      assert.ok(["tree", "direct"].includes(next.method), experiment.id);
+      assert.notEqual(frameBudgetMs(experiment.view.speed), undefined, experiment.id);
+    }
+  });
+
+  it("start a fresh Plummer run and keep the thread count", () => {
+    const binary = { ...DEFAULT_SETTINGS, setup: "kepler", threads: 2, run: 3 };
+    for (const experiment of EXPERIMENTS) {
+      const next = experimentSettings(binary, experiment);
+      assert.equal(next.setup, "plummer");
+      assert.equal(next.run, 4);
+      assert.equal(next.threads, 2);
+      assert.equal(changeKind(binary, next), "restart");
+    }
+  });
+
+  it("race at the default opening angle whatever ran before", () => {
+    const crude = experimentSettings(DEFAULT_SETTINGS, EXPERIMENTS[2]);
+    assert.equal(experimentSettings(crude, EXPERIMENTS[1]).theta, DEFAULT_SETTINGS.theta);
+  });
+
+  it("restart when the same experiment runs twice", () => {
+    const once = experimentSettings(DEFAULT_SETTINGS, EXPERIMENTS[2]);
+    const twice = experimentSettings(once, EXPERIMENTS[2]);
+    assert.equal(changeKind(once, twice), "restart");
+  });
+
+  it("run in the order a beginner meets the ideas, as the page numbers them", () => {
+    assert.deepEqual(EXPERIMENTS.map((experiment) => experiment.id), ["shortcut", "race", "too-far"]);
+    const page = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    const onPage = [...page.matchAll(/data-experiment="([^"]+)"/g)].map((match) => match[1]);
+    assert.deepEqual(onPage, ["shortcut", "race", "too-far"]);
+    for (const experiment of EXPERIMENTS) {
+      assert.ok(page.includes(`id="${experiment.target.slice(1)}"`), experiment.target);
+    }
+  });
+});
+
+describe("plain names on the controls", () => {
+  it("name θ, ε and Δt in everyday words that each control is described by", () => {
+    const page = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    for (const [id, words] of [["thetaPlain", "Shortcut strength"], ["epsPlain", "Smoothing of close encounters"], ["dtPlain", "Length of each step"]]) {
+      assert.ok(page.includes(`id="${id}">${words}<`), id);
+      assert.ok(page.includes(`aria-describedby="${id}"`), id);
+    }
   });
 });

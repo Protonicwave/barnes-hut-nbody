@@ -14,6 +14,7 @@ import {
   stepsTaken,
   withChange,
 } from "./settings.js";
+import { EXPERIMENTS, experimentSettings } from "./guide.js";
 import { runRecord } from "./record.js";
 import { defaultMarkedParticle, testText, walkCounts } from "./scope.js";
 import { Viewport } from "./viewport.js";
@@ -118,6 +119,7 @@ function syncControls() {
     $(id).disabled = module.controlsDisabled;
   }
   $("#seedBtn").disabled = module.controlsDisabled || controls.seedDisabled;
+  $$("[data-experiment]").forEach((button) => (button.disabled = module.controlsDisabled));
   $$('input[name="speed"]').forEach((radio) => (radio.disabled = module.controlsDisabled));
   $("#cellsToggle").hidden = controls.cellsHidden;
   $("#cellsToggle").disabled = controls.cellsDisabled || module.controlsDisabled;
@@ -143,7 +145,10 @@ function syncControls() {
 }
 
 function change(key, value) {
-  const next = withChange(settings, key, value);
+  applySettings(withChange(settings, key, value));
+}
+
+function applySettings(next) {
   const kind = changeKind(settings, next);
   settings = next;
   if (kind === "none") {
@@ -166,6 +171,29 @@ function change(key, value) {
   showCaption();
   needsFrame = true;
   syncControls();
+}
+
+// Guided experiments
+
+// An experiment stays marked until the next one starts: its watch line asks
+// the visitor to move controls, and doing so must not take the mark away.
+function runExperiment(experiment) {
+  clearExperimentMarks();
+  Object.assign(view, experiment.view);
+  applySettings(experimentSettings(settings, experiment));
+  $(`[data-experiment="${experiment.id}"]`).setAttribute("aria-pressed", "true");
+  setText("#guideWatch", experiment.watch);
+  const target = $(experiment.target);
+  target.dataset.watched = "true";
+  const box = target.getBoundingClientRect();
+  if (box.bottom < 0 || box.top > innerHeight) {
+    target.scrollIntoView({ block: "nearest", behavior: reducedMotion ? "auto" : "smooth" });
+  }
+}
+
+function clearExperimentMarks() {
+  $$("[data-experiment]").forEach((button) => button.setAttribute("aria-pressed", "false"));
+  $$("[data-watched]").forEach((panel) => delete panel.dataset.watched);
 }
 
 function wireControls() {
@@ -191,6 +219,9 @@ function wireControls() {
     needsFrame = true;
     syncControls();
   });
+  for (const experiment of EXPERIMENTS) {
+    $(`[data-experiment="${experiment.id}"]`).addEventListener("click", () => runExperiment(experiment));
+  }
   $("#reloadBtn").addEventListener("click", () => location.reload());
   $$(".copy").forEach((button) => button.addEventListener("click", () => copyCode(button)));
 }
