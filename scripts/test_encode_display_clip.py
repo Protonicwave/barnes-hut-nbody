@@ -202,6 +202,18 @@ def test_fit_clip_raises_naming_the_smallest_size_when_none_fits(tmp_path: Path)
     assert str(len(slowest.gif)) in str(raised.value)
 
 
+def test_main_exits_two_when_the_span_needs_too_many_frames(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    frames = tmp_path / "frames"
+    write_frames(frames, [0.0, 1000.0])
+
+    status = encoder.main([str(frames), str(tmp_path / "out")])
+
+    assert status == 2
+    assert "frames" in capsys.readouterr().err
+
+
 def test_main_writes_the_gif_and_the_still_and_exits_zero(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

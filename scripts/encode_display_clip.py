@@ -26,6 +26,9 @@ GIF_NAME = "collapse.gif"
 STILL_NAME = "collapse-still.png"
 MAX_GIF_BYTES = 4096 * 1024
 PALETTE_COLOURS = 256
+# Frames held in memory for one GIF, about 0.9 MB each at the size of the glass: 3 time
+# units at 25 frames per second take 151.
+MAX_CLIP_FRAMES = 600
 # Frame delays in centiseconds, fastest first: 25, 20, 16.7, 12.5 and 10 frames per second.
 FRAME_DELAYS_CS = (4, 5, 6, 8, 10)
 # Simulated time units that pass in one second of playback.
@@ -154,12 +157,18 @@ def fit_clip(
     """The GIF at the fastest frame delay in `delays_cs` that is within `limit_bytes`.
 
     Raises ClipOverLimit, naming the smallest size reached, when none fits, and
-    ValueError when `delays_cs` is empty.
+    ValueError when `delays_cs` is empty or a rate would need more than MAX_CLIP_FRAMES
+    frames.
     """
     times = [time for _, time in frames]
     sizes: list[tuple[int, int]] = []
     for delay_cs in delays_cs:
         indices = select_frames(times, delay_cs / 100 * SIM_TIME_PER_SECOND)
+        if len(indices) > MAX_CLIP_FRAMES:
+            raise ValueError(
+                f"t = {times[0]} to {times[-1]} needs {len(indices)} frames at"
+                f" {delay_cs} cs per frame, over the limit of {MAX_CLIP_FRAMES}"
+            )
         gif = encode_gif(_load([frames[index][0] for index in indices]), delay_cs)
         if len(gif) <= limit_bytes:
             return Clip(gif, delay_cs, indices)
