@@ -57,7 +57,11 @@ def test_builds_every_section_from_the_results(tmp_path: Path) -> None:
 
     data = export_page_data.build(tmp_path)
 
-    assert data["machine"] == {"cpu": "Test CPU", "physicalCores": 6}
+    assert data["machine"] == {
+        "cpu": "Test CPU",
+        "physicalCores": 6,
+        "coreMix": "2 big and 4 small",
+    }
     assert data["timing"][0]["median_ms"] == 1.5
     assert data["forceError"]["rows"] == [{"theta": 0.5, "median": 1.235e-3, "p99": 5.679e-3}]
     assert data["wasm"]["count"] == 16384
