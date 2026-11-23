@@ -2,8 +2,6 @@
 // it points at and what to watch there. Written for a reader with little
 // physics, so the copy says "star" where the controls say "particle".
 
-import { withChange } from "./settings.js";
-
 export const EXPERIMENTS = Object.freeze([
   Object.freeze({
     id: "shortcut",
@@ -39,11 +37,8 @@ export const EXPERIMENTS = Object.freeze([
 
 // The settings an experiment runs with. Every experiment builds a fresh
 // Plummer sphere, so the meters measure only what it shows; the thread count
-// is the visitor's machine and stays as it is.
+// is the visitor's machine and stays as it is. Each opening angle set here is
+// already on the slider's grid, which the tests check.
 export function experimentSettings(current, experiment) {
-  let next = { ...current, setup: "plummer", run: current.run + 1 };
-  for (const [key, value] of Object.entries(experiment.settings)) {
-    next = withChange(next, key, value);
-  }
-  return next;
+  return { ...current, ...experiment.settings, setup: "plummer", run: current.run + 1 };
 }
