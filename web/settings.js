@@ -21,9 +21,17 @@ export const THETA_WARNING_ABOVE = 0.7;
 export const VIEW_RADIUS = { plummer: 2.3, collapse: 1.3, kepler: 1 };
 export const REFERENCE_SPEED = { plummer: 1, collapse: 1.4, kepler: 0.7 };
 
+// Width over height of the glass, as .glass sets it in style.css. The view
+// radius fits the height, so the glass shows this much more across.
+export const GLASS_ASPECT = 5 / 4;
+
+// The smallest octree cell drawn is the glass height over this: about 4 px on
+// a 600 px glass. Smaller cells fill the core with solid ink.
+export const CELL_EDGE_DIVISIONS = 150;
+
 export const DEFAULT_SETTINGS = Object.freeze({
   setup: "plummer",
-  countIndex: 2,
+  countIndex: 4,
   seed: 1,
   // Raised by Reset to rebuild the same setup.
   run: 0,
@@ -47,7 +55,16 @@ export const particleCount = (settings) =>
 export const softening = (settings) =>
   settings.setup === "kepler" ? 0 : settings.softeningScale / Math.sqrt(particleCount(settings));
 
+// Two bodies have nothing for a tree to group, so a binary always runs by
+// direct summation whatever the method control says.
+export const effectiveMethod = (settings) => (settings.setup === "kepler" ? "direct" : settings.method);
+
 export const timestep = (settings) => TIMESTEPS[settings.timestepIndex];
+
+// Longest a frame spends stepping, by the steps a running frame asks for, which are the speed: a faster
+// setting may cost frame rate, which is what asking for it means.
+const FRAME_BUDGET_MS_BY_SPEED = { 1: 12, 4: 24, 16: 48 };
+export const frameBudgetMs = (speed) => FRAME_BUDGET_MS_BY_SPEED[speed];
 
 // Steps since the run started. A timestep change restarts the run, so the
 // time is always a whole number of the current timestep.
@@ -99,12 +116,15 @@ export function labels(settings) {
 // Which controls the settings leave out of use.
 export function controlState(settings) {
   const kepler = settings.setup === "kepler";
-  const direct = settings.method === "direct";
+  const direct = effectiveMethod(settings) === "direct";
   return {
     countDisabled: kepler,
     softeningDisabled: kepler,
+    methodDisabled: kepler,
+    seedDisabled: kepler,
     thetaDisabled: direct,
     thetaWarning: !direct && settings.theta > THETA_WARNING_ABOVE,
+    cellsDisabled: direct,
     cellsHidden: kepler,
   };
 }

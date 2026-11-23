@@ -16,8 +16,8 @@
 <body>
 <div id="glass"><canvas id="graticule"></canvas><canvas id="particles"></canvas><canvas id="view"></canvas></div>
 <script type="module">
-// Draws one 8,192 particle Plummer frame from the single-threaded build many
-// times and reports the median time of one Viewport.draw. page_budget.mjs
+// Draws one 8,192 particle Plummer frame from the single-threaded build, with
+// the octree cells in view and a tree walk, many times and reports the median time of one Viewport.draw. page_budget.mjs
 // reads window.benchResult.
 import { Runner } from "../runner.js";
 import { defaultMarkedParticle } from "../scope.js";
@@ -35,7 +35,7 @@ const SETTLE_STEPS = 8;
   const runner = new Runner(module, settings);
   const first = runner.frame({ steps: SETTLE_STEPS, budgetMs: 10000, probe: -1, wantCells: false }).message;
   const mark = defaultMarkedParticle(first.positions, settings.setup);
-  const { message } = runner.frame({ steps: 1, budgetMs: 10000, probe: mark, wantCells: false });
+  const { message } = runner.frame({ steps: 1, budgetMs: 10000, probe: mark, wantCells: true });
 
   const viewport = new Viewport(
     { graticule: document.getElementById("graticule"), particles: document.getElementById("particles"), overlay: document.getElementById("view") },
@@ -47,10 +47,10 @@ const SETTLE_STEPS = 8;
     bands: message.bands,
     stepped: true,
     mark,
-    cells: null,
+    cells: message.cells,
     probe: message.probe,
     trails: [],
-    showCells: false,
+    showCells: true,
   };
   const times = [];
   for (let draw = 0; draw < WARM_UP_DRAWS + DRAWS; draw++) {

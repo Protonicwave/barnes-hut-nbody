@@ -38,7 +38,14 @@ def read_machine(path: Path) -> dict[str, str | int]:
     fields = dict(
         line.partition("=")[::2] for line in path.read_text(encoding="utf-8").splitlines() if line
     )
-    return {"cpu": fields["cpu"], "physicalCores": int(fields["physical_cores"])}
+    missing = [key for key in ("cpu", "physical_cores", "core_mix") if key not in fields]
+    if missing:
+        raise ValueError(f"{path} has no {', '.join(missing)} line")
+    return {
+        "cpu": fields["cpu"],
+        "physicalCores": int(fields["physical_cores"]),
+        "coreMix": fields["core_mix"],
+    }
 
 
 def read_force_error(path: Path) -> list[dict[str, float]]:

@@ -139,7 +139,7 @@ function plot(svg, config) {
     }
     if (series.label) {
       const [lastX, lastY] = series.points.at(-1);
-      labels.push({ x: x(lastX) + 8, y: y(lastY) + 4, text: series.label, textClass: series.textClass });
+      labels.push({ x: x(lastX) + 8, y: y(series.labelY ?? lastY) + 4, text: series.label, textClass: series.textClass });
     }
   }
   separate(labels);
@@ -193,8 +193,8 @@ const threadsText = (threads) => `${threads} ${threads === 1 ? "thread" : "threa
 // the accuracy plates do not, since accuracy does not.
 export function figureCaptions(data) {
   const rows = data.timing;
-  const { cpu, physicalCores: cores } = data.machine;
-  const machine = `${cpu}, ${cores} physical cores`;
+  const { cpu, physicalCores: cores, coreMix } = data.machine;
+  const machine = `${cpu}, ${cores} physical cores, ${coreMix}`;
   const efficiency = data.budgets.timing.min_scaling_efficiency;
   const treeMs = findTiming(rows, "tree", REFERENCE_COUNT, REFERENCE_THREADS);
   const speedup = findTiming(rows, "direct", REFERENCE_COUNT, REFERENCE_THREADS) / treeMs;
@@ -302,6 +302,12 @@ function drawForceError(data) {
   });
 }
 
+const median = (values) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+};
+
 const driftLabel = (curve) => (curve.method === "direct" ? "direct" : `θ = ${curve.theta}`);
 const driftClasses = (curve) =>
   curve.method === "direct" ? ["l-direct", "t-direct"] : curve.theta === 0.5 ? ["l-tree", "t-tree"] : ["l-tree-soft", "t-soft"];
@@ -321,7 +327,8 @@ function drawDrift(data) {
     references: [{ y: data.budgets.timing.max_tree_drift, label: "tree budget at θ = 0.5" }],
     series: curves.map((curve) => {
       const [lineClass, textClass] = driftClasses(curve);
-      return { lineClass, textClass, label: driftLabel(curve), points: curve.points.filter(([, e]) => e > 0) };
+      const points = curve.points.filter(([, e]) => e > 0);
+      return { lineClass, textClass, label: driftLabel(curve), labelY: median(points.map(([, e]) => e)), points };
     }),
   });
 }

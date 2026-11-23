@@ -23,7 +23,7 @@ def write_results(directory: Path, drift_rows: str) -> None:
         encoding="utf-8",
     )
     (directory / "machine.txt").write_text(
-        "cpu=Test CPU\nphysical_cores=6\nother=x\n", encoding="utf-8"
+        "cpu=Test CPU\nphysical_cores=6\ncore_mix=2 big and 4 small\nother=x\n", encoding="utf-8"
     )
     (directory / "force_error.csv").write_text(
         "theta,median,p90,p99,max\n0.5,1.234567e-03,2e-3,5.6789e-03,1e-2\n", encoding="utf-8"
@@ -57,7 +57,11 @@ def test_builds_every_section_from_the_results(tmp_path: Path) -> None:
 
     data = export_page_data.build(tmp_path)
 
-    assert data["machine"] == {"cpu": "Test CPU", "physicalCores": 6}
+    assert data["machine"] == {
+        "cpu": "Test CPU",
+        "physicalCores": 6,
+        "coreMix": "2 big and 4 small",
+    }
     assert data["timing"][0]["median_ms"] == 1.5
     assert data["forceError"]["rows"] == [{"theta": 0.5, "median": 1.235e-3, "p99": 5.679e-3}]
     assert data["wasm"]["count"] == 16384
@@ -105,3 +109,11 @@ def test_committed_page_data_matches_the_committed_results() -> None:
 def test_rejects_results_missing_a_file(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         export_page_data.build(tmp_path)
+
+
+def test_rejects_a_machine_file_without_a_core_mix(tmp_path: Path) -> None:
+    machine = tmp_path / "machine.txt"
+    machine.write_text("cpu=Test CPU\nphysical_cores=6\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"machine.txt has no core_mix line"):
+        export_page_data.read_machine(machine)

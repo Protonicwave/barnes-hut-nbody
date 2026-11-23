@@ -34,9 +34,10 @@ constexpr unsigned MAX_BROWSER_THREADS = NBODY_WASM_MAX_THREADS;
 // Bounds one call: a step at the largest count takes about 0.6 s on one thread.
 constexpr std::size_t MAX_STEPS_PER_CALL = 1024;
 
-// Deepest octree level the overlay reports. Deeper levels hold a cell or two
-// per particle, which a page cannot draw usefully.
-constexpr unsigned MAX_OVERLAY_DEPTH = 5;
+// Deepest octree level the overlay reports. A Plummer root is about twelve
+// times the width of the page's view, so the cells inside the view start four
+// levels down; deeper than this they are a few pixels wide even in the core.
+constexpr unsigned MAX_OVERLAY_DEPTH = 10;
 
 // Eccentricity and semi-major axis of the Kepler setup.
 constexpr double KEPLER_ECCENTRICITY = 0.5;

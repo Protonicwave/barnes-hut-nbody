@@ -7,6 +7,7 @@ import {
   PARTICLE_COUNTS,
   changeKind,
   controlState,
+  effectiveMethod,
   initialSettings,
   labels,
   moduleState,
@@ -14,7 +15,7 @@ import {
   withChange,
 } from "./settings.js";
 import { runRecord } from "./record.js";
-import { defaultMarkedParticle, walkCounts } from "./scope.js";
+import { defaultMarkedParticle, testText, walkCounts } from "./scope.js";
 import { Viewport } from "./viewport.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -88,7 +89,10 @@ function syncControls() {
   setText("#nHint", controls.countDisabled ? "Two bodies, fixed." : `${PARTICLE_COUNTS[0]} to ${formatInteger(PARTICLE_COUNTS.at(-1))} in this tab.`);
   setText("#setupHint", SETUP_HINTS[settings.setup]);
 
-  $$('input[name="method"]').forEach((radio) => (radio.checked = radio.value === settings.method));
+  $$('input[name="method"]').forEach((radio) => {
+    radio.checked = radio.value === effectiveMethod(settings);
+    radio.disabled = controls.methodDisabled;
+  });
   $("#theta").value = String(settings.theta);
   $("#theta").disabled = controls.thetaDisabled;
   setText("#thetaOut", text.theta);
@@ -98,7 +102,7 @@ function syncControls() {
     ? "Direct summation has no opening angle."
     : controls.thetaWarning ? "Not recommended above about 0.7." : "Default 0.5. Smaller is more accurate and slower.";
   $$('input[name="eps"]').forEach((radio) => {
-    radio.checked = Number(radio.value) === settings.softeningScale;
+    radio.checked = !controls.softeningDisabled && Number(radio.value) === settings.softeningScale;
     radio.disabled = controls.softeningDisabled;
   });
   setText("#epsOut", text.softening);
@@ -110,13 +114,16 @@ function syncControls() {
   $$('input[name="speed"]').forEach((radio) => (radio.checked = Number(radio.value) === view.speed));
 
   $("#controls").disabled = module.controlsDisabled;
-  for (const id of ["#playBtn", "#resetBtn", "#seedBtn"]) {
+  for (const id of ["#playBtn", "#resetBtn"]) {
     $(id).disabled = module.controlsDisabled;
   }
+  $("#seedBtn").disabled = module.controlsDisabled || controls.seedDisabled;
   $$('input[name="speed"]').forEach((radio) => (radio.disabled = module.controlsDisabled));
   $("#cellsToggle").hidden = controls.cellsHidden;
+  $("#cellsToggle").disabled = controls.cellsDisabled || module.controlsDisabled;
   $("#cellsToggle").setAttribute("aria-pressed", String(view.showCells));
   setText("#playBtn", view.running ? "Pause" : "Play");
+  $("#seedNote").hidden = controls.seedDisabled;
   setText("#seedNote", text.seed);
   const glassSettings = [`ε ${text.softening}`, `Δt ${text.timestep}`];
   if (!controls.thetaDisabled && settings.setup !== "kepler") {
@@ -241,6 +248,10 @@ function showCaption() {
     text = `Marked particle: ${formatInteger(counts.particles)} particles, one by one`;
   } else if (counts) {
     text = `Marked particle: ${formatInteger(counts.cells)} cells + ${formatInteger(counts.particles)} particles`;
+    if (latest.probe.test) {
+      text += `
+${testText(latest.probe.test)}`;
+    }
   } else {
     return;
   }
@@ -266,7 +277,15 @@ function draw(stepped = false) {
 
 // Read outs
 
+const MEASUREMENT_PARTS = ["#timeBars", "#speedupRow", "#measurePairs", "#measureFine"];
+
 function showMeasurement() {
+  const none = settings.setup === "kepler";
+  $("#measureNone").hidden = !none;
+  MEASUREMENT_PARTS.forEach((id) => ($(id).hidden = none));
+  if (none) {
+    return;
+  }
   const ready = measurement && latest && measurement.count === latest.count;
   if (!ready) {
     for (const id of ["#tDirect", "#tTree", "#speedup", "#errMed", "#errP99", "#inter", "#interDirect"]) {
@@ -297,15 +316,39 @@ function showMeters() {
   }
 }
 
+// Achieved steps per second: the steps taken over the last RATE_WINDOW_MS of
+// running frames. Pausing or a restart starts the window again.
+const RATE_WINDOW_MS = 1000;
+let rateSamples = [];
+
+function stepRate(steps, now) {
+  if (!view.running) {
+    rateSamples = [];
+    return null;
+  }
+  if (rateSamples.length > 0 && steps < rateSamples.at(-1).steps) {
+    rateSamples = [];
+  }
+  rateSamples.push({ steps, now });
+  while (rateSamples.length > 1 && now - rateSamples[0].now > RATE_WINDOW_MS) {
+    rateSamples.shift();
+  }
+  const first = rateSamples[0];
+  return now > first.now ? (steps - first.steps) / ((now - first.now) / 1000) : null;
+}
+
 function showReadouts() {
   showRecord();
   showMeters();
   setText("#clockValue", latest.time.toFixed(2));
-  setText("#stepValue", formatInteger(stepsTaken(settings, latest.time)));
+  const steps = stepsTaken(settings, latest.time);
+  setText("#stepValue", formatInteger(steps));
+  const rate = stepRate(steps, performance.now());
+  setText("#rateValue", rate === null ? "0" : formatInteger(Math.round(rate)));
   const last = samples.at(-1);
   setText("#eNow", last ? scientific(last[1]) : "0");
   showMeasurement();
-  drawEnergy($("#energySvg"), samples, latest.time, settings.method);
+  drawEnergy($("#energySvg"), samples, latest.time, effectiveMethod(settings));
 }
 
 function keepTrails(message) {

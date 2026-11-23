@@ -6,12 +6,16 @@ import { after, describe, it } from "node:test";
 
 import { Runner } from "../runner.js";
 import {
+  CELL_EDGE_DIVISIONS,
   DEFAULT_SETTINGS,
+  GLASS_ASPECT,
   PARTICLE_COUNTS,
   SOFTENING_SCALES,
   TIMESTEP_LABELS,
   VIEW_RADIUS,
   controlState,
+  effectiveMethod,
+  frameBudgetMs,
   labels,
   moduleState,
   particleCount,
@@ -21,7 +25,7 @@ import {
 import { readFileSync } from "node:fs";
 import { decadeFraction, figureCaptions } from "../charts.js";
 import { runRecord } from "../record.js";
-import { defaultMarkedParticle, openedLeaves, openingTest, walkCounts } from "../scope.js";
+import { defaultMarkedParticle, openedLeaves, openingTest, testText, visibleCells, walkCounts } from "../scope.js";
 import createThreaded from "../wasm/threads/nbody.js";
 import createSingle from "../wasm/single/nbody.js";
 
@@ -133,13 +137,22 @@ describe("both builds", () => {
       for (let c = 4; c < cells.length; c += 5) depths.add(cells[c]);
       assert.deepEqual([...depths].sort(), [2, 3, 4]);
       assert.throws(() => simulation.treeCells(1), /depth.*got 1/);
-      assert.throws(() => simulation.treeCells(6), /depth.*got 6/);
+      assert.throws(() => simulation.treeCells(11), /depth.*got 11/);
 
       const trace = simulation.walkTrace(3);
       assert.ok(trace.interactions > 0 && trace.interactions < COUNT - 1);
       assert.ok(trace.opened.length > 0);
       assert.throws(() => simulation.walkTrace(COUNT), new RegExp(`index.*got ${COUNT}`));
       assert.throws(() => simulation.walkTrace(-1), /index.*got -1/);
+      simulation.delete();
+    });
+
+    it(`${name}: reports octree cells deeper than depth 5 and none deeper than 10`, () => {
+      const simulation = plummer(module);
+      const cells = simulation.treeCells(10);
+      let deepest = 0;
+      for (let c = 4; c < cells.length; c += 5) deepest = Math.max(deepest, cells[c]);
+      assert.ok(deepest > 5 && deepest <= 10, `deepest ${deepest}`);
       simulation.delete();
     });
 
@@ -325,6 +338,37 @@ describe("page controls reach the simulation with the value their label shows", 
     runner.close();
   });
 
+  it("the Kepler setup runs by direct summation and disables the controls that would not apply", () => {
+    const kepler = withChange(SMALL, "setup", "kepler");
+    assert.equal(effectiveMethod(kepler), "direct");
+    assert.equal(effectiveMethod(SMALL), "tree");
+    const state = controlState(kepler);
+    assert.deepEqual([state.thetaDisabled, state.methodDisabled, state.seedDisabled], [true, true, true]);
+    assert.deepEqual(
+      [controlState(SMALL).thetaDisabled, controlState(SMALL).methodDisabled, controlState(SMALL).seedDisabled],
+      [false, false, false]);
+    const module = recording(single);
+    const runner = new Runner(module, SMALL);
+    runner.change(kepler);
+    assert.equal(lastCall(module.calls, "create")[4], "direct");
+    runner.change(withChange(kepler, "method", "direct"));
+    runner.change(withChange(kepler, "theta", 0.7));
+    assert.equal(lastCall(module.calls, "setForceSettings")[1], "direct");
+    runner.close();
+    const record = runRecord(kepler, 0.5, null);
+    assert.match(record, /method="direct", threads=1,/);
+    assert.doesNotMatch(record, /theta/);
+  });
+
+  it("Whole tree is disabled under direct summation and hidden only for a binary", () => {
+    const direct = withChange(SMALL, "method", "direct");
+    assert.equal(controlState(SMALL).cellsDisabled, false);
+    assert.equal(controlState(direct).cellsDisabled, true);
+    assert.equal(controlState(direct).cellsHidden, false);
+    assert.equal(controlState(withChange(SMALL, "setup", "collapse")).cellsHidden, false);
+    assert.equal(controlState(withChange(SMALL, "setup", "kepler")).cellsHidden, true);
+  });
+
   it("warns above theta 0.7 only while the tree is in use", () => {
     assert.equal(controlState(withChange(SMALL, "theta", 0.8)).thetaWarning, true);
     assert.equal(controlState(withChange(SMALL, "theta", 0.7)).thetaWarning, false);
@@ -403,10 +447,10 @@ describe("the run record", () => {
     "import barnes_hut as bh",
     "",
     "# same seed; the starting particles can differ from this tab by platform",
-    "positions, velocities, masses = bh.plummer_sphere(1024, seed=1)",
+    "positions, velocities, masses = bh.plummer_sphere(4096, seed=1)",
     "simulation = bh.Simulation(",
     "    positions, velocities, masses,",
-    "    dt=1 / 128, softening=4 / np.sqrt(1024),",
+    "    dt=1 / 128, softening=4 / np.sqrt(4096),",
     '    method="tree", theta=0.5, threads=8,',
     ")",
     "start = simulation.total_energy()",
@@ -423,7 +467,8 @@ describe("the run record", () => {
     const record = runRecord(settings, 1, null);
     assert.match(record, /bh\.uniform_sphere\(4096, seed=7\)/);
     assert.match(record, /dt=1 \/ 64, softening=2 \/ np\.sqrt\(4096\)/);
-    assert.match(record, /method="direct", theta=0\.7, threads=2/);
+    assert.match(record, /method="direct", threads=2/);
+    assert.doesNotMatch(record, /theta/);
     assert.match(record, /simulation\.step\(64\)/);
   });
 
@@ -462,6 +507,20 @@ describe("figureCaptions", () => {
       assert.ok(text.includes("Test CPU"), text);
       assert.ok(text.includes("8 threads"), text);
     }
+  });
+
+  it("names the core mix on the plates that depend on the machine", () => {
+    const mix = results.machine.coreMix;
+    assert.match(mix, /performance .*efficiency/);
+    for (const text of [captions.time, captions.threads, captions.wasm]) {
+      assert.ok(text.includes(mix), text);
+    }
+  });
+
+  it("numbers the figures on the page from 1 without a gap", () => {
+    const page = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    const numbers = [...page.matchAll(/<span class="fig-no">Fig\. (\d+)<\/span>/g)].map((m) => Number(m[1]));
+    assert.deepEqual(numbers, [1, 2, 3, 4]);
   });
 
   it("gives the count of the force plate and states no repetition count", () => {
@@ -529,6 +588,24 @@ describe("frames", () => {
     runner.close();
   });
 
+  it("time each method twice and report the smaller time", () => {
+    const module = recording(single);
+    const runner = new Runner(module, SMALL);
+    frame(runner, { steps: 0 });
+    const methods = module.calls.filter((call) => call[0] === "evaluateForces").map((call) => call[1]);
+    assert.deepEqual(methods, ["direct", "direct", "tree", "tree"]);
+    runner.close();
+  });
+
+  it("measure a paused frame straight after a restart, once", () => {
+    const runner = new Runner(single, SMALL);
+    assert.notEqual(frame(runner, { steps: 0 }).measurement, null);
+    assert.equal(frame(runner, { steps: 0 }).measurement, null);
+    runner.change({ ...SMALL, seed: SMALL.seed + 1 });
+    assert.notEqual(frame(runner, { steps: 0 }).measurement, null);
+    runner.close();
+  });
+
   it("send octree cells when wanted and a walk for a probed particle", () => {
     const runner = new Runner(single, SMALL);
     assert.equal(frame(runner, { steps: 1 }).cells, null);
@@ -539,6 +616,22 @@ describe("frames", () => {
     assert.equal(frame(runner, { steps: 1, wantCells: true }).cells, null);
     assert.ok(frame(runner, { steps: 4, wantCells: true }).cells.length > 0);
     assert.equal(frame(runner, { probe: 999 }).probe, null);
+    runner.close();
+  });
+
+  it("send only cells that overlap the glass and are wide enough to see", () => {
+    const runner = new Runner(single, { ...SMALL, countIndex: 2 });
+    const { cells } = frame(runner, { wantCells: true });
+    const halfHeight = VIEW_RADIUS.plummer;
+    const halfWidth = GLASS_ASPECT * halfHeight;
+    let deepest = 0;
+    for (let k = 0; k < cells.length; k += 5) {
+      const half = cells[k + 3] / 2;
+      assert.ok(Math.abs(cells[k]) - half < halfWidth && Math.abs(cells[k + 1]) - half < halfHeight, `cell ${k / 5}`);
+      assert.ok(cells[k + 3] >= (2 * halfHeight) / CELL_EDGE_DIVISIONS, `cell ${k / 5}`);
+      deepest = Math.max(deepest, cells[k + 4]);
+    }
+    assert.ok(deepest > 5, `deepest ${deepest}`);
     runner.close();
   });
 
@@ -587,6 +680,24 @@ describe("the scope's claims about one particle's walk", () => {
     runner.change({ ...SMALL, method: "direct" });
     assert.equal(frame(runner, { steps: 0, probe: TRACED }).probe, null);
     runner.close();
+  });
+
+  it("visible cells overlap the view, reach the minimum edge and appear once per projected square", () => {
+    // Centre x, y, z, edge, depth. The view is 4 wide and 2 high, and the
+    // smallest edge drawn is 0.5.
+    const cells = new Float64Array([
+      0, 0, 0, 8, 1, // the root, larger than the view: kept
+      2.2, 0, 0, 0.5, 4, // straddles the right edge: kept
+      0, 1.3, 0, 0.5, 4, // entirely above: dropped
+      -2.3, 0, 0, 0.5, 4, // entirely left: dropped
+      0.25, 0.25, 0.25, 0.5, 4, // kept
+      0.25, 0.25, -0.25, 0.5, 4, // the same square below it in z: dropped
+      0.125, 0.125, 0, 0.25, 5, // below the minimum edge: dropped
+    ]);
+    const visible = visibleCells(cells, 2, 1, 0.5);
+    assert.ok(visible instanceof Float64Array);
+    assert.deepEqual([...visible], [0, 0, 0, 8, 1, 2.2, 0, 0, 0.5, 4, 0.25, 0.25, 0.25, 0.5, 4]);
+    assert.equal(visibleCells(new Float64Array(0), 2, 1, 0.5).length, 0);
   });
 
   it("opening test picks the largest edge, then the nearest, and is null with no accepted cell", () => {
@@ -654,5 +765,29 @@ describe("the scope's claims about one particle's walk", () => {
     assert.ok(leafCount > 0);
     assert.equal(openedLeaves(new Float64Array(0), new Float64Array(0)).length, 0);
     runner.close();
+  });
+});
+
+describe("the frame budget scales with the speed", () => {
+  it("gives 12, 24 and 48 ms at 1, 4 and 16 steps per frame", () => {
+    assert.deepEqual([1, 4, 16].map(frameBudgetMs), [12, 24, 48]);
+  });
+});
+
+describe("the opening test label", () => {
+  it("uses the fewest decimals at which the two sides differ", () => {
+    assert.equal(testText({ ratio: 0.4996, theta: 0.5 }), "s/(d − δ) = 0.4996 < θ = 0.5000");
+    assert.equal(testText({ ratio: 0.48, theta: 0.5 }), "s/(d − δ) = 0.48 < θ = 0.50");
+  });
+
+  it("reads approximately equal on a tie", () => {
+    assert.equal(testText({ ratio: 0.5, theta: 0.5 }), "s/(d − δ) = 0.5000 ≈ θ = 0.5000");
+  });
+});
+
+describe("a run record with no steps", () => {
+  it("leaves the step call out at time 0 and keeps it afterwards", () => {
+    assert.ok(!runRecord(DEFAULT_SETTINGS, 0, null).includes("simulation.step"));
+    assert.ok(runRecord(DEFAULT_SETTINGS, 1, null).includes("simulation.step("));
   });
 });

@@ -38,6 +38,40 @@ export function openingTest(accepted, centresOfMass, position, theta) {
   return { ...best, offset, ratio: best.edge / (best.distance - offset), theta };
 }
 
+const TEST_DECIMALS = [2, 3, 4];
+
+// The opening test as written on the glass, with the fewest decimals at which
+// its two sides differ. Two sides equal at the most decimals are "≈", so the
+// label never reads as a false inequality.
+export function testText({ ratio, theta }) {
+  const decimals = TEST_DECIMALS.find((places) => ratio.toFixed(places) !== theta.toFixed(places));
+  const relation = decimals === undefined ? "≈" : ratio < theta ? "<" : ">";
+  const places = decimals ?? TEST_DECIMALS.at(-1);
+  return `s/(d − δ) = ${ratio.toFixed(places)} ${relation} θ = ${theta.toFixed(places)}`;
+}
+
+// The cells of a treeCells array that show on a glass centred on the origin,
+// halfWidth by halfHeight in length units: those whose square overlaps it,
+// with an edge of at least minEdge, and one of each set of cells at the same
+// depth that project to the same square along z. Cells at one depth share
+// their x and y arithmetic, so such a set has identical centres.
+export function visibleCells(cells, halfWidth, halfHeight, minEdge) {
+  const kept = [];
+  const squares = new Set();
+  for (let first = 0; first < cells.length; first += NUMBERS_PER_CELL) {
+    const [x, y, , edge, depth] = cells.subarray(first, first + NUMBERS_PER_CELL);
+    const overlaps = Math.abs(x) - edge / 2 < halfWidth && Math.abs(y) - edge / 2 < halfHeight;
+    const square = `${depth} ${x} ${y}`;
+    if (overlaps && edge >= minEdge && !squares.has(square)) {
+      squares.add(square);
+      kept.push(first);
+    }
+  }
+  const visible = new Float64Array(NUMBERS_PER_CELL * kept.length);
+  kept.forEach((first, cell) => visible.set(cells.subarray(first, first + NUMBERS_PER_CELL), NUMBERS_PER_CELL * cell));
+  return visible;
+}
+
 // The cells and the single particles one particle's force is summed from,
 // counted once however the cells overlap on screen. Null when there is
 // nothing to count: no tree walk yet, or a setup with no tree.
