@@ -8,7 +8,7 @@ A gravitational N-body simulator in C++20 that uses a Barnes-Hut octree, runs it
 
 <picture>
   <source media="(prefers-reduced-motion: reduce)" srcset="docs/screenshots/collapse-still.png">
-  <img alt="The simulator's display running a cold collapse of 4,096 stars: the sphere falls in on itself and bounces, with the octree cells one marked star's force is summed from drawn around it" src="docs/screenshots/collapse.gif">
+  <img alt="The simulator's display running a cold collapse of 4,096 stars: the sphere falls in on itself and bounces. Around one marked star are drawn the octree cells its force is summed from" src="docs/screenshots/collapse.gif">
 </picture>
 
 ## Method
@@ -135,7 +135,7 @@ const error = Math.abs(simulation.energy() - simulation.initialEnergy())
 ## Documentation
 
 - [docs/building.md](docs/building.md): building, the Python and WebAssembly interfaces, serving the page, deployment and the checks.
-- [docs/reproducing.md](docs/reproducing.md): the commands behind every number and figure above, and behind the animation at the top: `node web/test/record_display.mjs` records it and `python scripts/encode_display_clip.py build/display-frames docs/screenshots` encodes it, failing when the GIF is over 4 MiB.
+- [docs/reproducing.md](docs/reproducing.md): the commands behind every number and figure above, and behind the animation at the top: `node web/test/record_display.mjs --chrome "<path to chrome>"` records it and `python scripts/encode_display_clip.py build/display-frames docs/screenshots` encodes it, failing when the GIF is over 4 MiB.
 
 ## Licence
 
