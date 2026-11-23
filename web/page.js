@@ -10,6 +10,7 @@ import {
   initialSettings,
   labels,
   moduleState,
+  stepsTaken,
   withChange,
 } from "./settings.js";
 import { runRecord } from "./record.js";
@@ -64,7 +65,7 @@ let trails = [];
 // the first frame after a restart.
 let hoverIndex = -1;
 let defaultMark = -1;
-let captionHtml = "";
+let captionText = "";
 let awaitingFrame = false;
 let needsFrame = true;
 let framesSinceReadout = 0;
@@ -117,8 +118,15 @@ function syncControls() {
   $("#cellsToggle").setAttribute("aria-pressed", String(view.showCells));
   setText("#playBtn", view.running ? "Pause" : "Play");
   setText("#seedNote", text.seed);
+  const glassSettings = [`ε ${text.softening}`, `Δt ${text.timestep}`];
+  if (!controls.thetaDisabled) {
+    glassSettings.unshift(`θ ${text.theta}`);
+  }
+  // En spaces keep the readings apart without a separator glyph.
+  setText("#glassSettings", glassSettings.join("  "));
   showRecord();
 
+  $("#simulator").dataset.module = status;
   $("#stateLoading").dataset.show = String(module.showLoading);
   $("#stateFailed").dataset.show = String(module.showFailed);
   $("#reloadBtn").hidden = !module.showFailed;
@@ -223,24 +231,22 @@ function wireViewport() {
   });
 }
 
-// What the figure counted for the marked particle, written under it.
+// What the force on the marked particle was summed from, written on the glass.
 function showCaption() {
   const counts = latest && walkCounts(latest.probe, latest.count, settings.setup, settings.method);
-  let html;
+  let text;
   if (settings.setup === "kepler") {
-    html = "Two bodies, no tree.";
+    text = "Two bodies, no tree";
   } else if (counts && settings.method === "direct") {
-    html = `Marked particle: force summed from <b>${formatInteger(counts.particles)}</b> particles, one by one. No tree.`;
+    text = `Marked particle: ${formatInteger(counts.particles)} particles, one by one`;
   } else if (counts) {
-    html = `Marked particle: force summed from <b>${formatInteger(counts.cells)}</b> cells and ` +
-      `<b>${formatInteger(counts.particles)}</b> particles, against <b>${formatInteger(latest.count - 1)}</b> by direct summation. ` +
-      `A cell is used whole when s / (d − δ) &lt; θ = ${settings.theta.toFixed(2)}. Cells are drawn along z, so they overlap.`;
+    text = `Marked particle: ${formatInteger(counts.cells)} cells + ${formatInteger(counts.particles)} particles`;
   } else {
     return;
   }
-  if (html !== captionHtml) {
-    captionHtml = html;
-    $("#scopeCaption").innerHTML = html;
+  if (text !== captionText) {
+    captionText = text;
+    setText("#scopeCaption", text);
   }
 }
 
@@ -294,8 +300,8 @@ function showMeters() {
 function showReadouts() {
   showRecord();
   showMeters();
-  setText("#timeVal", latest.time.toFixed(2));
   setText("#clockValue", latest.time.toFixed(2));
+  setText("#stepValue", formatInteger(stepsTaken(settings, latest.time)));
   const last = samples.at(-1);
   setText("#eNow", last ? scientific(last[1]) : "0");
   showMeasurement();

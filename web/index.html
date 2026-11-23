@@ -16,6 +16,7 @@
 <header class="site-head">
   <div class="wrap">
     <a class="wordmark" href="#top">barnes-hut-nbody</a>
+    <p class="tagline">A Barnes-Hut tree code in C++20, compiled to WebAssembly and running in this tab.</p>
     <nav aria-label="Sections">
       <a href="#simulator" aria-current="true">Simulator</a>
       <a href="#results">Results</a>
@@ -28,76 +29,130 @@
 
 <main id="top">
 <div class="wrap">
+  <h1 class="visually-hidden">Barnes-Hut N-body</h1>
 
-  <div class="intro">
-    <h1>Barnes-Hut N-body</h1>
-    <p>A gravitational N-body simulator in C++20. A tree of cells stands in for distant groups of particles, so the force on each one costs about <span class="math">N&thinsp;log&thinsp;N</span> operations instead of <span class="math">N<sup class="u">2</sup></span>. The simulation below is that C++ code, compiled to WebAssembly, running in this tab.</p>
+  <div class="banner" id="fallbackBanner" data-show="false">
+    <strong>Running on one thread.</strong>
+    <span>This page is not cross-origin isolated, so the browser withholds WebAssembly threads. The result is the same, only slower. <a href="#use">See the two headers it needs.</a></span>
   </div>
 
-  <section id="simulator" aria-label="Simulator" class="sim">
+  <section id="simulator" aria-label="Simulator" class="instrument" data-module="loading">
 
-    <figure class="scope" id="viewport">
-      <div class="scope-head">
-        <span><span class="fig-id">Fig. 1</span> Particles projected along the z axis</span>
-        <button class="toggle" id="cellsToggle" type="button" aria-pressed="false">Whole tree</button>
-      </div>
-      <div class="glass">
-      <canvas id="graticule" aria-hidden="true"></canvas>
-      <canvas id="particles" aria-hidden="true"></canvas>
-      <canvas id="view" role="img" aria-label="Particles on a ruled grid, projected along the z axis. One particle is marked, with the tree cells its force is summed from outlined. Hover or tap a particle to mark it."></canvas>
-      <div class="hud hud-tl"><span class="live-dot" id="liveDot" data-live="off"></span><span id="modeBadge">Loading</span></div>
-      <div class="hud hud-tr clock">t = <b id="clockValue">0.00</b></div>
-      <div class="hud hud-scale"><span class="scale-bar" id="scaleBar"></span><span>1 length unit</span></div>
-      <div class="overlay-state" id="stateLoading" data-show="true" role="status">
-        <h2>Loading the simulation</h2>
-        <div class="loadline"></div>
-        <p>Fetching the WebAssembly module. The controls unlock when it is ready.</p>
-      </div>
-      <div class="overlay-state" id="stateFailed" data-show="false" role="alert">
-        <h2>The simulation module did not load</h2>
-        <p>Either the browser blocked WebAssembly or the file did not arrive. Reload the page to try again. The Python package runs the same code if this keeps happening.</p>
-        <p class="detail" id="failedDetail"></p>
-        <button class="btn" type="button" id="reloadBtn">Reload</button>
-      </div>
-      </div>
-      <figcaption class="scope-foot" id="scopeCaption" aria-live="polite">The marked particle's tree walk appears once the simulation runs.</figcaption>
-    </figure>
+    <fieldset class="col col-panel" id="controls" disabled>
+      <legend class="visually-hidden">Simulation controls</legend>
 
-    <div class="transport">
-      <div class="transport-main">
+      <div class="stage">
+        <div class="stage-head"><span class="idx">1</span><h2>Setup</h2></div>
+        <div class="field">
+          <label for="setup">Initial conditions</label>
+          <select id="setup">
+            <option value="plummer">Plummer sphere</option>
+            <option value="collapse">Cold collapse</option>
+            <option value="kepler">Kepler binary</option>
+          </select>
+          <div class="hint" id="setupHint"></div>
+        </div>
+        <div class="field">
+          <div class="field-row"><label for="nIdx">Particles <span class="math">N</span></label><output id="nOut" for="nIdx"></output></div>
+          <div class="range" style="--minor: 20%; --major: 20%"><span class="ruler" aria-hidden="true"></span><input type="range" id="nIdx" min="0" max="5" step="1" value="2"></div>
+          <div class="ticks" aria-hidden="true"><span>256</span><span>512</span><span>1k</span><span>2k</span><span>4k</span><span>8k</span></div>
+          <div class="hint" id="nHint"></div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-head"><span class="idx">2</span><h2>Force</h2></div>
+        <div class="field">
+          <span class="label" id="methodLabel">Method</span>
+          <div class="seg" role="radiogroup" aria-labelledby="methodLabel">
+            <label><input type="radio" name="method" value="direct"><span><i class="sw sw-direct" aria-hidden="true"></i>Direct</span></label>
+            <label><input type="radio" name="method" value="tree" checked><span><i class="sw sw-tree" aria-hidden="true"></i>Tree</span></label>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-row"><label for="theta">Opening angle <span class="math">θ</span></label><output id="thetaOut" for="theta"></output></div>
+          <div class="range" style="--minor: 12.5%; --major: 25%"><span class="zone" aria-hidden="true"></span><span class="ruler" aria-hidden="true"></span><input type="range" id="theta" min="0.2" max="1" step="0.1" value="0.5"></div>
+          <div class="ticks" aria-hidden="true"><span>0.2</span><span>0.4</span><span>0.6</span><span>0.8</span><span>1.0</span></div>
+          <div class="hint" id="thetaHint"></div>
+        </div>
+        <div class="field">
+          <div class="field-row"><span class="label" id="epsLabel">Softening <span class="math">ε</span></span><output id="epsOut"></output></div>
+          <div class="seg" role="radiogroup" aria-labelledby="epsLabel">
+            <label><input type="radio" name="eps" value="1"><span>1/√N</span></label>
+            <label><input type="radio" name="eps" value="2"><span>2/√N</span></label>
+            <label><input type="radio" name="eps" value="4" checked><span>4/√N</span></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-head"><span class="idx">3</span><h2>Integrator</h2><span class="aside">leapfrog</span></div>
+        <div class="field">
+          <span class="label" id="dtLabel">Timestep <span class="math">Δt</span></span>
+          <div class="seg" role="radiogroup" aria-labelledby="dtLabel">
+            <label><input type="radio" name="dt" value="0"><span>1/256</span></label>
+            <label><input type="radio" name="dt" value="1" checked><span>1/128</span></label>
+            <label><input type="radio" name="dt" value="2"><span>1/64</span></label>
+          </div>
+        </div>
+        <div class="field">
+          <span class="label" id="thrLabel">Threads</span>
+          <div class="seg" role="radiogroup" aria-labelledby="thrLabel" id="thrSeg">
+            <label><input type="radio" name="thr" value="1"><span>1</span></label>
+            <label><input type="radio" name="thr" value="2"><span>2</span></label>
+            <label><input type="radio" name="thr" value="4"><span>4</span></label>
+            <label><input type="radio" name="thr" value="8" checked><span>8</span></label>
+          </div>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="col col-display">
+      <figure class="scope">
+        <div class="bezel">
+          <span>Particles projected along <span class="math">z</span></span>
+          <span class="num" id="seedNote">seed 1</span>
+          <button class="toggle" id="cellsToggle" type="button" aria-pressed="false">Whole tree</button>
+        </div>
+        <div class="glass">
+          <canvas id="graticule" aria-hidden="true"></canvas>
+          <canvas id="particles" aria-hidden="true"></canvas>
+          <canvas id="view" role="img" aria-label="Particles on a ruled grid, projected along the z axis. One particle is marked, with the tree cells its force is summed from outlined. Hover or tap a particle to mark it."></canvas>
+          <div class="hud hud-tl"><span class="live-dot" id="liveDot" data-live="off"></span><span id="modeBadge">Loading</span></div>
+          <div class="hud hud-tr running-only">
+            <span class="clock">t = <b id="clockValue">0.00</b></span>
+            <span>step <span id="stepValue">0</span></span>
+            <span class="hud-scale"><span class="scale-bar" id="scaleBar"></span>1 length unit</span>
+          </div>
+          <div class="hud hud-bl running-only" id="glassSettings"></div>
+          <div class="hud hud-br running-only" id="scopeCaption" aria-live="polite"></div>
+          <div class="overlay-state" id="stateLoading" data-show="true" role="status">
+            <p>Loading the WebAssembly module. The controls unlock when it is ready.</p>
+          </div>
+          <div class="overlay-state" id="stateFailed" data-show="false" role="alert">
+            <p class="err">The simulation module did not load.</p>
+            <p>The browser blocked WebAssembly or the file did not arrive. Reload to try again.</p>
+            <p class="detail" id="failedDetail"></p>
+            <button class="btn" type="button" id="reloadBtn">Reload</button>
+          </div>
+        </div>
+      </figure>
+
+      <div class="transport">
         <button class="btn btn-primary" id="playBtn" type="button">Pause</button>
         <button class="btn" id="resetBtn" type="button">Reset</button>
         <button class="btn" id="seedBtn" type="button">New seed</button>
-      </div>
-      <div class="field" style="min-width: 12.5rem">
         <div class="seg" role="radiogroup" aria-label="Steps per frame">
           <label><input type="radio" name="speed" value="1"><span>1×</span></label>
           <label><input type="radio" name="speed" value="4" checked><span>4×</span></label>
           <label><input type="radio" name="speed" value="16"><span>16×</span></label>
         </div>
       </div>
-      <div class="readout-time"><span>t</span><b class="num" id="timeVal">0.00</b><span class="fine" id="seedNote">seed 1</span></div>
     </div>
 
-    <aside class="rail" aria-label="Controls and measurements">
-      <div class="banner" id="fallbackBanner" data-show="false" style="border-left-color: var(--tree)">
-        <strong>Running on one thread.</strong>
-        <span>This page is not cross-origin isolated, so the browser withholds WebAssembly threads. The result is the same, only slower. <a href="#use">See the two headers it needs.</a></span>
-      </div>
-
-      <div class="group">
-        <div class="group-head">
-          <h3>Run record</h3>
-          <button class="copy" type="button" data-copy="record">Copy</button>
-        </div>
-        <pre class="record" id="record" tabindex="0" aria-label="Python call that repeats this run"></pre>
-      </div>
-
-      <div class="group">
-        <div class="group-head">
-          <h3>Conservation</h3>
-          <span class="fine">log scale, 10⁻⁶ to 10⁻¹</span>
-        </div>
+    <div class="col col-read">
+      <div class="stage">
+        <div class="stage-head"><h2>Conservation</h2><span class="aside">log scale</span></div>
         <div class="meters">
           <div class="meter"><span class="meter-name">Relative energy error</span><b class="num" id="mEnergy">0</b><span class="meter-track" id="trEnergy" aria-hidden="true"></span></div>
           <div class="meter"><span class="meter-name">Momentum change</span><b class="num" id="mMomentum">0</b><span class="meter-track" id="trMomentum" aria-hidden="true"></span></div>
@@ -107,102 +162,36 @@
         <p class="fine">Each reading is the change since the start of the run, or since the last restart or method change. Units with G = M = 1.</p>
       </div>
 
-      <fieldset class="controls" id="controls" disabled>
-        <legend class="visually-hidden">Simulation controls</legend>
+      <div class="stage strip">
+        <div class="stage-head"><h2>Energy error against time</h2><span class="aside">now <b class="num" id="eNow">0</b></span></div>
+        <svg id="energySvg" class="chart" role="img" aria-label="Relative total-energy error against time, on a logarithmic scale"></svg>
+      </div>
 
-        <div class="group">
-          <h3>Force</h3>
-          <div class="field">
-            <span class="label" id="methodLabel">Method</span>
-            <div class="seg" role="radiogroup" aria-labelledby="methodLabel">
-              <label><input type="radio" name="method" value="direct"><span>Direct</span></label>
-              <label><input type="radio" name="method" value="tree" checked><span>Tree</span></label>
-            </div>
-          </div>
-          <div class="field">
-            <div class="field-row"><label for="theta">Opening angle <span class="math">θ</span></label><output id="thetaOut" for="theta"></output></div>
-            <div class="range" style="--minor: 12.5%; --major: 25%"><span class="zone" aria-hidden="true"></span><span class="ruler" aria-hidden="true"></span><input type="range" id="theta" min="0.2" max="1" step="0.1" value="0.5"></div>
-            <div class="ticks" aria-hidden="true"><span>0.2</span><span>0.4</span><span>0.6</span><span>0.8</span><span>1.0</span></div>
-            <div class="hint" id="thetaHint"></div>
-          </div>
-          <div class="field">
-            <div class="field-row"><span class="label" id="epsLabel">Softening <span class="math">ε</span></span><output id="epsOut"></output></div>
-            <div class="seg" role="radiogroup" aria-labelledby="epsLabel">
-              <label><input type="radio" name="eps" value="1"><span>1/√N</span></label>
-              <label><input type="radio" name="eps" value="2"><span>2/√N</span></label>
-              <label><input type="radio" name="eps" value="4" checked><span>4/√N</span></label>
-            </div>
-          </div>
+      <div class="stage measure">
+        <div class="stage-head"><h2>Measured in this tab</h2></div>
+        <div class="bars" id="timeBars">
+          <div class="bar-row" data-kind="tree"><span>Tree</span><span class="track"><span class="fill" style="width:20%"></span></span><span class="v num" id="tTree">…</span></div>
+          <div class="bar-row" data-kind="direct"><span>Direct</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="v num" id="tDirect">…</span></div>
         </div>
-
-        <div class="group">
-          <h3>Setup</h3>
-          <div class="field">
-            <label for="setup">Initial conditions</label>
-            <select id="setup">
-              <option value="plummer">Plummer sphere</option>
-              <option value="collapse">Cold collapse</option>
-              <option value="kepler">Kepler binary</option>
-            </select>
-            <div class="hint" id="setupHint"></div>
-          </div>
-          <div class="field">
-            <div class="field-row"><label for="nIdx">Particles</label><output id="nOut" for="nIdx"></output></div>
-            <div class="range" style="--minor: 20%; --major: 20%"><span class="ruler" aria-hidden="true"></span><input type="range" id="nIdx" min="0" max="5" step="1" value="2"></div>
-            <div class="ticks" aria-hidden="true"><span>256</span><span>512</span><span>1,024</span><span>2,048</span><span>4,096</span><span>8,192</span></div>
-            <div class="hint" id="nHint"></div>
-          </div>
-        </div>
-
-        <div class="group">
-          <h3>Integrator</h3>
-          <div class="field">
-            <span class="label" id="dtLabel">Timestep <span class="math">Δt</span>, leapfrog</span>
-            <div class="seg" role="radiogroup" aria-labelledby="dtLabel">
-              <label><input type="radio" name="dt" value="0"><span>1/256</span></label>
-              <label><input type="radio" name="dt" value="1" checked><span>1/128</span></label>
-              <label><input type="radio" name="dt" value="2"><span>1/64</span></label>
-            </div>
-          </div>
-          <div class="field">
-            <span class="label" id="thrLabel">Threads</span>
-            <div class="seg" role="radiogroup" aria-labelledby="thrLabel" id="thrSeg">
-              <label><input type="radio" name="thr" value="1"><span>1</span></label>
-              <label><input type="radio" name="thr" value="2"><span>2</span></label>
-              <label><input type="radio" name="thr" value="4"><span>4</span></label>
-              <label><input type="radio" name="thr" value="8" checked><span>8</span></label>
-            </div>
-          </div>
-        </div>
-      </fieldset>
-
-      <div class="group measure" aria-label="Live measurements">
-        <h3>Measured in this tab</h3>
-        <div>
-          <div class="bars" id="timeBars">
-            <div class="bar-row" data-kind="direct"><span>Direct</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="v num" id="tDirect">…</span></div>
-            <div class="bar-row" data-kind="tree"><span>Tree</span><span class="track"><span class="fill" style="width:20%"></span></span><span class="v num" id="tTree">…</span></div>
-          </div>
-          <div class="big" style="margin-top: 12px"><b class="num" id="speedup">…</b><span>faster than direct, per force evaluation</span></div>
-        </div>
+        <div class="big"><b class="num" id="speedup">…</b><span>faster than direct, per force evaluation</span></div>
         <dl class="pairs">
           <dt>Force error, median</dt><dd id="errMed">…</dd>
           <dt>Force error, 99th percentile</dt><dd id="errP99">…</dd>
           <dt>Interactions per particle</dt><dd id="inter">…</dd>
           <dt>Direct would use</dt><dd id="interDirect">…</dd>
         </dl>
-        <p class="fine">Timed on the current positions every few seconds, with the tree at the θ above. Error is against direct summation at the same ε.</p>
+        <p class="fine">Timed on the current positions every few seconds, with the tree at the θ set. Error is against direct summation at the same ε.</p>
       </div>
-    </aside>
-
-    <div class="strip" id="strip">
-      <div class="strip-head">
-        <h3>Relative energy error over time</h3>
-        <span class="val num">now <b id="eNow">0</b></span>
-      </div>
-      <svg id="energySvg" class="chart" role="img" aria-label="Relative total-energy error against time, on a logarithmic scale"></svg>
     </div>
   </section>
+
+  <details class="reproduce">
+    <summary>Reproduce in Python <span>the same run from the package</span></summary>
+    <div class="code">
+      <button class="copy" type="button" data-copy="record">Copy</button>
+      <pre class="record" id="record" tabindex="0" aria-label="Python call that repeats this run"></pre>
+    </div>
+  </details>
 </div>
 
 <section id="results" class="band" aria-labelledby="results-h">
