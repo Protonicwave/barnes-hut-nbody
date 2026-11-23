@@ -16,7 +16,7 @@ export const EXPERIMENTS = Object.freeze([
   Object.freeze({
     id: "race",
     target: "#measured",
-    settings: { countIndex: 5, method: "direct" },
+    settings: { countIndex: 5, method: "direct", theta: 0.5 },
     view: { speed: 4, showCells: false, running: true },
     watch: "This is the long way, with every pull counted one by one. Note the steps per second "
       + "at the top right of the display, then switch Method to Tree. Measured in this tab "

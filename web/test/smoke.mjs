@@ -817,6 +817,11 @@ describe("the guided experiments", () => {
     }
   });
 
+  it("race at the default opening angle whatever ran before", () => {
+    const crude = experimentSettings(DEFAULT_SETTINGS, EXPERIMENTS[2]);
+    assert.equal(experimentSettings(crude, EXPERIMENTS[1]).theta, DEFAULT_SETTINGS.theta);
+  });
+
   it("restart when the same experiment runs twice", () => {
     const once = experimentSettings(DEFAULT_SETTINGS, EXPERIMENTS[2]);
     const twice = experimentSettings(once, EXPERIMENTS[2]);
