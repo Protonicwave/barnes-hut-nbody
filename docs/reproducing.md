@@ -67,3 +67,24 @@ Wasm builds from [building.md](building.md) and Chrome:
 ```
 node web/test/screenshot.mjs --chrome "C:\Program Files\Google\Chrome\Application\chrome.exe"
 ```
+
+## Animation
+
+`docs/screenshots/collapse.gif` shows the simulator's display running a cold
+collapse of 4,096 stars from rest to t = 3, and `collapse-still.png` is its
+middle frame, shown instead when the reader's system asks for reduced motion.
+The recorder steps the threaded build one step per frame and writes each frame
+with its simulated time to `build/display-frames/`:
+
+```
+node web/test/record_display.mjs --chrome "C:\Program Files\Google\Chrome\Application\chrome.exe"
+```
+
+The encoder picks frames at even steps of simulated time, half a time unit
+per second of playback, at the fastest of 25, 20, 16.7, 12.5 and 10 frames
+per second that keeps the GIF within 4 MiB. It prints the size beside the
+limit and exits 1, writing nothing, when no rate fits:
+
+```
+python scripts/encode_display_clip.py build/display-frames docs/screenshots
+```

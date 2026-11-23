@@ -7,8 +7,8 @@ A gravitational N-body simulator in C++20 that uses a Barnes-Hut octree, runs it
 **Try it: https://barnes-hut-nbody.pages.dev/**
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/hero-dark.png">
-  <img alt="The simulator page running a Plummer sphere, with the octree cells, the settings panel and the conservation meters" src="docs/screenshots/hero-light.png">
+  <source media="(prefers-reduced-motion: reduce)" srcset="docs/screenshots/collapse-still.png">
+  <img alt="The simulator's display running a cold collapse of 4,096 stars: the sphere falls in on itself and bounces, with the octree cells one marked star's force is summed from drawn around it" src="docs/screenshots/collapse.gif">
 </picture>
 
 ## Method
@@ -88,6 +88,11 @@ Over 28.25 time units, about ten crossing times, at N = 4096 with $`\Delta t = 1
 
 The same core compiles to WebAssembly. One tree force evaluation at N = 16384 takes 1.03 times as long as native on one thread and 1.01 times as long on eight, under Node 26.4.0.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/hero-dark.png">
+  <img alt="The simulator page running a Plummer sphere, with the octree cells, the settings panel and the conservation meters" src="docs/screenshots/hero-light.png">
+</picture>
+
 Results are bitwise identical for every thread count, and between the single-threaded and threaded WebAssembly builds. The commands that produced each figure are in [docs/reproducing.md](docs/reproducing.md).
 
 ## Quick start
@@ -130,7 +135,7 @@ const error = Math.abs(simulation.energy() - simulation.initialEnergy())
 ## Documentation
 
 - [docs/building.md](docs/building.md): building, the Python and WebAssembly interfaces, serving the page, deployment and the checks.
-- [docs/reproducing.md](docs/reproducing.md): the commands behind every number and figure above.
+- [docs/reproducing.md](docs/reproducing.md): the commands behind every number and figure above, and behind the animation at the top: `node web/test/record_display.mjs` records it and `python scripts/encode_display_clip.py build/display-frames docs/screenshots` encodes it, failing when the GIF is over 4 MiB.
 
 ## Licence
 
