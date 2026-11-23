@@ -445,7 +445,8 @@ describe("the run record", () => {
     const record = runRecord(settings, 1, null);
     assert.match(record, /bh\.uniform_sphere\(4096, seed=7\)/);
     assert.match(record, /dt=1 \/ 64, softening=2 \/ np\.sqrt\(4096\)/);
-    assert.match(record, /method="direct", theta=0\.7, threads=2/);
+    assert.match(record, /method="direct", threads=2/);
+    assert.doesNotMatch(record, /theta/);
     assert.match(record, /simulation\.step\(64\)/);
   });
 
