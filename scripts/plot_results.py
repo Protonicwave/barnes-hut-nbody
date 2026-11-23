@@ -38,16 +38,17 @@ class Palette:
     thetas: tuple[str, str, str, str]
 
 
+# Tree and direct are the hex values of the page's --tree-ink and --direct-ink.
 LIGHT = Palette(
     page="#fbfcfd",
     ink="#131b26",
     ink_muted="#5c646e",
     grid="#dfe3e8",
     spine="#b9c0c8",
-    direct="#364355",
-    tree="#bd6700",
-    tree_soft="#e4b572",
-    thetas=("#e4b572", "#d08a2c", "#bd6700", "#8e4300"),
+    direct="#a12d79",
+    tree="#00697a",
+    tree_soft="#68abb6",
+    thetas=("#77bac6", "#3595a4", "#00697a", "#004551"),
 )
 DARK = Palette(
     page="#14181e",
@@ -55,10 +56,10 @@ DARK = Palette(
     ink_muted="#969ca3",
     grid="#2b3138",
     spine="#4e5661",
-    direct="#9aa8ba",
-    tree="#e8aa4e",
-    tree_soft="#a85c00",
-    thetas=("#a85c00", "#d08a2c", "#e8aa4e", "#f0c98a"),
+    direct="#f38ec9",
+    tree="#61dce9",
+    tree_soft="#286f76",
+    thetas=("#286f76", "#39aab6", "#61dce9", "#adf3fb"),
 )
 
 REFERENCE_COUNT = 65536
