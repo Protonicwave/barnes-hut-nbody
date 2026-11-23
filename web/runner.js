@@ -48,6 +48,7 @@ export class Runner {
   #stepsSinceCells = Infinity;
   #measureAgain = false;
   #lastMeasuredFrame = 0;
+  #measuredSinceRestart = false;
 
   constructor(module, settings, now = () => performance.now()) {
     this.#module = module;
@@ -107,7 +108,7 @@ export class Runner {
       bands,
       cells: this.#cells(wantCells, resendCells),
       probe: this.#probe(probe, count),
-      measurement: this.#measurementDue() ? this.#measure() : null,
+      measurement: this.#measurementDue(taken === 0) ? this.#measure() : null,
     };
     this.#pendingSamples = [];
     return { message, transfer: transferables(message) };
@@ -125,6 +126,7 @@ export class Runner {
     this.#stepsSinceCells = Infinity;
     this.#measureAgain = false;
     this.#lastMeasuredFrame = 0;
+    this.#measuredSinceRestart = false;
     this.#startSeries();
   }
 
@@ -228,27 +230,36 @@ export class Runner {
     };
   }
 
-  // Paused frames repeat the frame count, so a frame is measured once.
-  #measurementDue() {
+  // Paused frames repeat the frame count, so a frame is measured once. A run
+  // paused straight after a restart is measured on its first frame, because
+  // it never reaches the scheduled one.
+  #measurementDue(paused) {
     const frames = this.#frames;
     const scheduled = frames !== this.#lastMeasuredFrame &&
       (frames === FIRST_MEASURE_FRAME || (frames > 0 && frames % REMEASURE_FRAMES === 0));
-    const due = this.#measureAgain || scheduled;
+    const due = this.#measureAgain || scheduled || (paused && !this.#measuredSinceRestart);
     this.#measureAgain = false;
     if (due) {
       this.#lastMeasuredFrame = frames;
+      this.#measuredSinceRestart = true;
     }
     return due;
   }
 
-  // Times one direct and one tree evaluation on the current positions, then
+  // Times a direct and a tree evaluation on the current positions, then
   // compares the tree's forces with direct summation's.
   #measure() {
     const simulation = this.#simulation;
-    const directMs = this.#timed(() => simulation.evaluateForces("direct"));
-    const treeMs = this.#timed(() => simulation.evaluateForces("tree"));
+    const directMs = this.#fastestOfTwo(() => simulation.evaluateForces("direct"));
+    const treeMs = this.#fastestOfTwo(() => simulation.evaluateForces("tree"));
     const { medianError, p99Error, meanInteractions } = simulation.compare("tree");
     return { count: particleCount(this.#settings), directMs, treeMs, medianError, p99Error, meanInteractions };
+  }
+
+  // The first run after a restart or a thread change is slower than the rest,
+  // so the smaller of two is the figure that matches steady running.
+  #fastestOfTwo(work) {
+    return Math.min(this.#timed(work), this.#timed(work));
   }
 
   #timed(work) {

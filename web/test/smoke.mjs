@@ -549,6 +549,24 @@ describe("frames", () => {
     runner.close();
   });
 
+  it("time each method twice and report the smaller time", () => {
+    const module = recording(single);
+    const runner = new Runner(module, SMALL);
+    frame(runner, { steps: 0 });
+    const methods = module.calls.filter((call) => call[0] === "evaluateForces").map((call) => call[1]);
+    assert.deepEqual(methods, ["direct", "direct", "tree", "tree"]);
+    runner.close();
+  });
+
+  it("measure a paused frame straight after a restart, once", () => {
+    const runner = new Runner(single, SMALL);
+    assert.notEqual(frame(runner, { steps: 0 }).measurement, null);
+    assert.equal(frame(runner, { steps: 0 }).measurement, null);
+    runner.change({ ...SMALL, seed: SMALL.seed + 1 });
+    assert.notEqual(frame(runner, { steps: 0 }).measurement, null);
+    runner.close();
+  });
+
   it("send octree cells when wanted and a walk for a probed particle", () => {
     const runner = new Runner(single, SMALL);
     assert.equal(frame(runner, { steps: 1 }).cells, null);
