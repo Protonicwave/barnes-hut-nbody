@@ -148,20 +148,15 @@ def _load(paths: Sequence[Path]) -> list[Image.Image]:
     return loaded
 
 
-def fit_clip(
-    frames: Sequence[tuple[Path, float]],
-    limit_bytes: int,
-    delays_cs: Sequence[int] = FRAME_DELAYS_CS,
-) -> Clip:
-    """The GIF at the fastest frame delay in `delays_cs` that is within `limit_bytes`.
+def fit_clip(frames: Sequence[tuple[Path, float]], limit_bytes: int) -> Clip:
+    """The GIF at the fastest frame delay in FRAME_DELAYS_CS that is within `limit_bytes`.
 
     Raises ClipOverLimit, naming the smallest size reached, when none fits, and
-    ValueError when `delays_cs` is empty or a rate would need more than MAX_CLIP_FRAMES
-    frames.
+    ValueError when a rate would need more than MAX_CLIP_FRAMES frames.
     """
     times = [time for _, time in frames]
     sizes: list[tuple[int, int]] = []
-    for delay_cs in delays_cs:
+    for delay_cs in FRAME_DELAYS_CS:
         indices = select_frames(times, delay_cs / 100 * SIM_TIME_PER_SECOND)
         if len(indices) > MAX_CLIP_FRAMES:
             raise ValueError(

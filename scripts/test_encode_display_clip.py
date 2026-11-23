@@ -173,33 +173,37 @@ def test_fit_clip_returns_the_fastest_rate_within_the_limit(tmp_path: Path) -> N
     assert len(clip.gif) <= 10**9
 
 
+def slowest_gif_bytes(frames: list[tuple[Path, float]]) -> int:
+    delay_cs = encoder.FRAME_DELAYS_CS[-1]
+    indices = encoder.select_frames(
+        [time for _, time in frames], delay_cs / 100 * encoder.SIM_TIME_PER_SECOND
+    )
+    images = []
+    for index in indices:
+        with Image.open(frames[index][0]) as image:
+            images.append(image.convert("RGB"))
+    return len(encoder.encode_gif(images, delay_cs))
+
+
 def test_fit_clip_drops_to_a_slower_rate_when_the_fastest_is_over(tmp_path: Path) -> None:
     frames = write_frames(tmp_path, [i * 0.005 for i in range(40)])
     fastest = encoder.fit_clip(frames, 10**9)
-    slowest = encoder.fit_clip(frames, 10**9, delays_cs=(encoder.FRAME_DELAYS_CS[-1],))
 
-    clip = encoder.fit_clip(frames, (len(fastest.gif) + len(slowest.gif)) // 2)
+    clip = encoder.fit_clip(frames, (len(fastest.gif) + slowest_gif_bytes(frames)) // 2)
 
     assert clip.delay_cs > encoder.FRAME_DELAYS_CS[0]
     assert len(clip.gif) < len(fastest.gif)
 
 
-def test_fit_clip_rejects_an_empty_list_of_delays(tmp_path: Path) -> None:
-    frames = write_frames(tmp_path, [0.0, 0.1])
-
-    with pytest.raises(ValueError, match="empty"):
-        encoder.fit_clip(frames, 10**9, delays_cs=())
-
-
 def test_fit_clip_raises_naming_the_smallest_size_when_none_fits(tmp_path: Path) -> None:
     frames = write_frames(tmp_path, [i * 0.005 for i in range(40)])
-    slowest = encoder.fit_clip(frames, 10**9, delays_cs=(encoder.FRAME_DELAYS_CS[-1],))
+    slowest_bytes = slowest_gif_bytes(frames)
 
     with pytest.raises(encoder.ClipOverLimit) as raised:
         encoder.fit_clip(frames, 1)
 
-    assert raised.value.smallest_bytes == len(slowest.gif)
-    assert str(len(slowest.gif)) in str(raised.value)
+    assert raised.value.smallest_bytes == slowest_bytes
+    assert str(slowest_bytes) in str(raised.value)
 
 
 def test_main_exits_two_when_the_span_needs_too_many_frames(
