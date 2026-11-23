@@ -6,26 +6,26 @@ import { after, describe, it } from "node:test";
 
 import { Runner } from "../runner.js";
 import {
+  CELL_EDGE_DIVISIONS,
   DEFAULT_SETTINGS,
+  GLASS_ASPECT,
   PARTICLE_COUNTS,
   SOFTENING_SCALES,
   TIMESTEP_LABELS,
   VIEW_RADIUS,
   controlState,
+  effectiveMethod,
+  frameBudgetMs,
   labels,
   moduleState,
   particleCount,
   stepsTaken,
   withChange,
 } from "../settings.js";
-import { CELL_EDGE_DIVISIONS, GLASS_ASPECT } from "../settings.js";
 import { readFileSync } from "node:fs";
 import { decadeFraction, figureCaptions } from "../charts.js";
 import { runRecord } from "../record.js";
-import { defaultMarkedParticle, openedLeaves, openingTest, walkCounts } from "../scope.js";
-import { visibleCells } from "../scope.js";
-import { testText } from "../scope.js";
-import { effectiveMethod, frameBudgetMs } from "../settings.js";
+import { defaultMarkedParticle, openedLeaves, openingTest, testText, visibleCells, walkCounts } from "../scope.js";
 import createThreaded from "../wasm/threads/nbody.js";
 import createSingle from "../wasm/single/nbody.js";
 
