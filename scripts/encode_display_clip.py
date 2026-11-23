@@ -15,7 +15,7 @@ import math
 import shutil
 import sys
 from bisect import bisect_left
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,7 +24,8 @@ from PIL import Image
 MANIFEST_NAME = "frames.json"
 GIF_NAME = "collapse.gif"
 STILL_NAME = "collapse-still.png"
-MAX_GIF_BYTES = 1536 * 1024
+MAX_GIF_BYTES = 4096 * 1024
+PALETTE_COLOURS = 256
 # Frame delays in centiseconds, fastest first: 25, 20, 16.7, 12.5 and 10 frames per second.
 FRAME_DELAYS_CS = (4, 5, 6, 8, 10)
 # Simulated time units that pass in one second of playback.
@@ -111,26 +112,38 @@ def select_frames(times: Sequence[float], interval: float) -> list[int]:
     return indices
 
 
-def encode_gif(images: Iterable[Image.Image], delay_cs: int) -> bytes:
-    """A looping GIF with an adaptive palette and `delay_cs` centiseconds per frame."""
-    iterator = iter(images)
-    first = next(iterator)
+def encode_gif(images: Sequence[Image.Image], delay_cs: int) -> bytes:
+    """A looping GIF with `delay_cs` centiseconds per frame and one palette for every frame.
+
+    The palette is taken from the first, middle and last frames. A palette per frame
+    would draw an unchanged pixel in a new colour whenever the palette moves, so the
+    GIF could not leave it out of the next frame.
+    """
+    width, height = images[0].size
+    samples = (images[0], images[len(images) // 2], images[-1])
+    sheet = Image.new("RGB", (width, height * len(samples)))
+    for row, sample in enumerate(samples):
+        sheet.paste(sample, (0, height * row))
+    palette = sheet.quantize(PALETTE_COLOURS, dither=Image.Dither.NONE)
+    frames = [image.quantize(palette=palette, dither=Image.Dither.NONE) for image in images]
     buffer = io.BytesIO()
-    first.save(
+    frames[0].save(
         buffer,
         format="GIF",
         save_all=True,
-        append_images=iterator,
+        append_images=frames[1:],
         duration=delay_cs * 10,
         loop=0,
     )
     return buffer.getvalue()
 
 
-def _load(paths: Sequence[Path]) -> Iterator[Image.Image]:
+def _load(paths: Sequence[Path]) -> list[Image.Image]:
+    loaded = []
     for path in paths:
         with Image.open(path) as image:
-            yield image.convert("RGB")
+            loaded.append(image.convert("RGB"))
+    return loaded
 
 
 def fit_clip(

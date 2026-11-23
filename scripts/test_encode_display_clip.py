@@ -133,6 +133,34 @@ def test_encode_gif_writes_a_looping_gif_of_the_given_length_and_delay() -> None
         assert read_back.size == SIZE
 
 
+def column_ramp(shift: int) -> Image.Image:
+    """A frame of 300 columns, each one colour and no two alike, so that a palette of
+    256 entries cannot hold them all."""
+    width = 300
+    image = Image.new("RGB", (width, 8))
+    row = [((x + shift) % 256, (x * 7) % 256, x // 2) for x in range(width)]
+    image.putdata(row * 8)
+    return image
+
+
+def read_back_frames(gif: bytes) -> list[Image.Image]:
+    frames = []
+    with Image.open(io.BytesIO(gif)) as read_back:
+        for number in range(read_back.n_frames):
+            read_back.seek(number)
+            frames.append(read_back.convert("RGB"))
+    return frames
+
+
+def test_encode_gif_draws_a_shared_colour_alike_in_every_frame() -> None:
+    first, second = column_ramp(0), column_ramp(40)
+    second.paste(first.crop((0, 0, 20, 8)))
+
+    frames = read_back_frames(encoder.encode_gif([first, second], 5))
+
+    assert frames[0].crop((0, 0, 20, 8)).tobytes() == frames[1].crop((0, 0, 20, 8)).tobytes()
+
+
 def test_fit_clip_returns_the_fastest_rate_within_the_limit(tmp_path: Path) -> None:
     frames = write_frames(tmp_path, [i * 0.005 for i in range(40)])
 
