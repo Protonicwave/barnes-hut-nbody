@@ -31,7 +31,7 @@ export const CELL_EDGE_DIVISIONS = 150;
 
 export const DEFAULT_SETTINGS = Object.freeze({
   setup: "plummer",
-  countIndex: 2,
+  countIndex: 4,
   seed: 1,
   // Raised by Reset to rebuild the same setup.
   run: 0,
