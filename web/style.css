@@ -144,13 +144,12 @@ section[id] { scroll-margin-top: 72px; }
 .exp:hover:enabled { background: var(--key-down); }
 .exp[aria-pressed="true"] { background: var(--key-down); box-shadow: inset 0 -2px 0 var(--ink); }
 .exp:disabled { opacity: 0.45; cursor: not-allowed; }
-.guide-watch { font-size: 0.8125rem; color: var(--ink-2); min-height: 4lh; }
+.guide-watch { font-size: 0.8125rem; color: var(--ink-2); }
 /* The panel an experiment asks the visitor to watch. A neutral outline, since
    cyan and magenta mean tree and direct everywhere on the page. */
 [data-watched="true"] { outline: 1px solid var(--ink); outline-offset: 4px; border-radius: var(--r-s); }
 @media (max-width: 760px) {
   .guide { grid-template-columns: minmax(0, 1fr); margin-top: var(--sp-3); padding: var(--sp-4); }
-  .guide-watch { min-height: 0; }
 }
 
 /* -------------------------------------------------------------- instrument
