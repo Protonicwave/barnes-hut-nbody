@@ -115,6 +115,7 @@ function syncControls() {
   }
   $$('input[name="speed"]').forEach((radio) => (radio.disabled = module.controlsDisabled));
   $("#cellsToggle").hidden = controls.cellsHidden;
+  $("#cellsToggle").disabled = controls.cellsDisabled || module.controlsDisabled;
   $("#cellsToggle").setAttribute("aria-pressed", String(view.showCells));
   setText("#playBtn", view.running ? "Pause" : "Play");
   setText("#seedNote", text.seed);

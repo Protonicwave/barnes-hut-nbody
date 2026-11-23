@@ -178,9 +178,11 @@ fieldset.col-panel { border: 0; margin: 0; }
   background: var(--key); color: var(--ink); cursor: pointer; font-size: 0.8125rem;
   display: inline-flex; align-items: center; gap: 8px;
 }
-.toggle::before { content: ""; width: 10px; height: 10px; border: 1.5px solid var(--tree-ink); border-radius: 2px; }
-.toggle[aria-pressed="true"]::before { background: var(--tree-ink); }
-.toggle:hover { background: var(--key-down); }
+.toggle::before { content: ""; width: 10px; height: 10px; border: 1.5px solid var(--view-dim); border-radius: 2px; }
+.toggle[aria-pressed="true"]::before { background: var(--view-dim); }
+.toggle:hover:enabled { background: var(--key-down); }
+.toggle:disabled { color: var(--ink-3); cursor: not-allowed; }
+.toggle:disabled::before { opacity: 0.4; }
 
 /* Loading and failure: a line or two of status over the bare graticule. */
 .overlay-state {

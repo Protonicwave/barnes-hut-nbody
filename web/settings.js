@@ -21,6 +21,14 @@ export const THETA_WARNING_ABOVE = 0.7;
 export const VIEW_RADIUS = { plummer: 2.3, collapse: 1.3, kepler: 1 };
 export const REFERENCE_SPEED = { plummer: 1, collapse: 1.4, kepler: 0.7 };
 
+// Width over height of the glass, as .glass sets it in style.css. The view
+// radius fits the height, so the glass shows this much more across.
+export const GLASS_ASPECT = 5 / 4;
+
+// The smallest octree cell drawn is the glass height over this: about 4 px on
+// a 600 px glass. Smaller cells fill the core with solid ink.
+export const CELL_EDGE_DIVISIONS = 150;
+
 export const DEFAULT_SETTINGS = Object.freeze({
   setup: "plummer",
   countIndex: 2,
@@ -105,6 +113,7 @@ export function controlState(settings) {
     softeningDisabled: kepler,
     thetaDisabled: direct,
     thetaWarning: !direct && settings.theta > THETA_WARNING_ABOVE,
+    cellsDisabled: direct,
     cellsHidden: kepler,
   };
 }

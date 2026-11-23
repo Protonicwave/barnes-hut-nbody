@@ -3,8 +3,11 @@
 // under Node, so every control's effect on the simulation is tested here.
 
 import {
+  CELL_EDGE_DIVISIONS,
+  GLASS_ASPECT,
   REFERENCE_SPEED,
   SPEED_BANDS,
+  VIEW_RADIUS,
   changeKind,
   energyInterval,
   isEnergyBaselineReset,
@@ -12,11 +15,13 @@ import {
   softening,
   timestep,
 } from "./settings.js";
-import { openedLeaves, openingTest } from "./scope.js";
+import { openedLeaves, openingTest, visibleCells } from "./scope.js";
 
-// Deepest octree level drawn, and steps between recomputing the cells: the
-// tree moves slowly, and building it again costs about one force evaluation.
-const OVERLAY_DEPTH = 5;
+// Deepest octree level asked for, and steps between recomputing the cells:
+// the tree moves slowly, and building it again costs about one force
+// evaluation. A Plummer root spans about 60 units against a view of 4.6, so
+// cells no wider than the view sit four or more levels down.
+const OVERLAY_DEPTH = 10;
 const CELL_REFRESH_STEPS = 4;
 
 // The force comparison runs on this frame after a restart and then on every
@@ -183,8 +188,8 @@ export class Runner {
     return { positions, bands };
   }
 
-  // The octree cells to draw, or null when the page has them already, does
-  // not want them, or the setup has no tree worth drawing.
+  // The octree cells inside the view, or null when the page has them already,
+  // does not want them, or the setup has no tree worth drawing.
   #cells(wanted, resend) {
     if (!wanted || this.#settings.setup === "kepler") {
       this.#stepsSinceCells = Infinity;
@@ -197,7 +202,9 @@ export class Runner {
       return null;
     }
     this.#stepsSinceCells = 0;
-    return this.#simulation.treeCells(OVERLAY_DEPTH);
+    const halfHeight = VIEW_RADIUS[this.#settings.setup];
+    return visibleCells(this.#simulation.treeCells(OVERLAY_DEPTH), GLASS_ASPECT * halfHeight, halfHeight,
+      (2 * halfHeight) / CELL_EDGE_DIVISIONS);
   }
 
   // The tree walk of one particle, with the opening test of its largest

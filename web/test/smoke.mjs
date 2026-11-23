@@ -18,10 +18,12 @@ import {
   stepsTaken,
   withChange,
 } from "../settings.js";
+import { CELL_EDGE_DIVISIONS, GLASS_ASPECT } from "../settings.js";
 import { readFileSync } from "node:fs";
 import { decadeFraction, figureCaptions } from "../charts.js";
 import { runRecord } from "../record.js";
 import { defaultMarkedParticle, openedLeaves, openingTest, walkCounts } from "../scope.js";
+import { visibleCells } from "../scope.js";
 import createThreaded from "../wasm/threads/nbody.js";
 import createSingle from "../wasm/single/nbody.js";
 
@@ -140,6 +142,15 @@ describe("both builds", () => {
       assert.ok(trace.opened.length > 0);
       assert.throws(() => simulation.walkTrace(COUNT), new RegExp(`index.*got ${COUNT}`));
       assert.throws(() => simulation.walkTrace(-1), /index.*got -1/);
+      simulation.delete();
+    });
+
+    it(`${name}: reports octree cells deeper than depth 5 and none deeper than 10`, () => {
+      const simulation = plummer(module);
+      const cells = simulation.treeCells(10);
+      let deepest = 0;
+      for (let c = 4; c < cells.length; c += 5) deepest = Math.max(deepest, cells[c]);
+      assert.ok(deepest > 5 && deepest <= 10, `deepest ${deepest}`);
       simulation.delete();
     });
 
@@ -323,6 +334,15 @@ describe("page controls reach the simulation with the value their label shows", 
     assert.equal(message.cells, null);
     assert.equal(message.probe, null);
     runner.close();
+  });
+
+  it("Whole tree is disabled under direct summation and hidden only for a binary", () => {
+    const direct = withChange(SMALL, "method", "direct");
+    assert.equal(controlState(SMALL).cellsDisabled, false);
+    assert.equal(controlState(direct).cellsDisabled, true);
+    assert.equal(controlState(direct).cellsHidden, false);
+    assert.equal(controlState(withChange(SMALL, "setup", "collapse")).cellsHidden, false);
+    assert.equal(controlState(withChange(SMALL, "setup", "kepler")).cellsHidden, true);
   });
 
   it("warns above theta 0.7 only while the tree is in use", () => {
@@ -542,6 +562,22 @@ describe("frames", () => {
     runner.close();
   });
 
+  it("send only cells that overlap the glass and are wide enough to see", () => {
+    const runner = new Runner(single, { ...SMALL, countIndex: 2 });
+    const { cells } = frame(runner, { wantCells: true });
+    const halfHeight = VIEW_RADIUS.plummer;
+    const halfWidth = GLASS_ASPECT * halfHeight;
+    let deepest = 0;
+    for (let k = 0; k < cells.length; k += 5) {
+      const half = cells[k + 3] / 2;
+      assert.ok(Math.abs(cells[k]) - half < halfWidth && Math.abs(cells[k + 1]) - half < halfHeight, `cell ${k / 5}`);
+      assert.ok(cells[k + 3] >= (2 * halfHeight) / CELL_EDGE_DIVISIONS, `cell ${k / 5}`);
+      deepest = Math.max(deepest, cells[k + 4]);
+    }
+    assert.ok(deepest > 5, `deepest ${deepest}`);
+    runner.close();
+  });
+
   it("stop stepping once the time budget is spent", () => {
     let clock = 0;
     const runner = new Runner(single, SMALL, () => (clock += 5));
@@ -587,6 +623,24 @@ describe("the scope's claims about one particle's walk", () => {
     runner.change({ ...SMALL, method: "direct" });
     assert.equal(frame(runner, { steps: 0, probe: TRACED }).probe, null);
     runner.close();
+  });
+
+  it("visible cells overlap the view, reach the minimum edge and appear once per projected square", () => {
+    // Centre x, y, z, edge, depth. The view is 4 wide and 2 high, and the
+    // smallest edge drawn is 0.5.
+    const cells = new Float64Array([
+      0, 0, 0, 8, 1, // the root, larger than the view: kept
+      2.2, 0, 0, 0.5, 4, // straddles the right edge: kept
+      0, 1.3, 0, 0.5, 4, // entirely above: dropped
+      -2.3, 0, 0, 0.5, 4, // entirely left: dropped
+      0.25, 0.25, 0.25, 0.5, 4, // kept
+      0.25, 0.25, -0.25, 0.5, 4, // the same square below it in z: dropped
+      0.125, 0.125, 0, 0.25, 5, // below the minimum edge: dropped
+    ]);
+    const visible = visibleCells(cells, 2, 1, 0.5);
+    assert.ok(visible instanceof Float64Array);
+    assert.deepEqual([...visible], [0, 0, 0, 8, 1, 2.2, 0, 0, 0.5, 4, 0.25, 0.25, 0.25, 0.5, 4]);
+    assert.equal(visibleCells(new Float64Array(0), 2, 1, 0.5).length, 0);
   });
 
   it("opening test picks the largest edge, then the nearest, and is null with no accepted cell", () => {

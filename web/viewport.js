@@ -267,8 +267,9 @@ export class Viewport {
 
   #drawCells(cells) {
     const context = this.#overlay;
-    context.strokeStyle = this.#colours.tree;
-    context.globalAlpha = 0.2;
+    context.strokeStyle = this.#colours.dim;
+    context.globalAlpha = 0.5;
+    context.lineWidth = 1;
     context.beginPath();
     for (let k = 0; k < cells.length; k += NUMBERS_PER_CELL) {
       context.rect(...this.#cellRectangle(cells, k));
