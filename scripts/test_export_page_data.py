@@ -109,3 +109,11 @@ def test_committed_page_data_matches_the_committed_results() -> None:
 def test_rejects_results_missing_a_file(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         export_page_data.build(tmp_path)
+
+
+def test_rejects_a_machine_file_without_a_core_mix(tmp_path: Path) -> None:
+    machine = tmp_path / "machine.txt"
+    machine.write_text("cpu=Test CPU\nphysical_cores=6\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"machine.txt has no core_mix line"):
+        export_page_data.read_machine(machine)
