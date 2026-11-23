@@ -114,7 +114,7 @@ error, and the results figures. The controls run in the order an
 experiment is set up: initial conditions, force, integrator. Beside the
 display are three conservation meters: the relative energy error, the change
 in total momentum and the shift of the centre of mass, each since the start
-of the run or the last method change. Under it, "Reproduce in Python" gives
+of the run or the last method change. Under the instrument, "Reproduce in Python" gives
 the Python call that repeats the run on screen. `web/data/results.json` holds the figures
 it draws, written from `results/` by `python scripts/export_page_data.py`. The
 fonts in `web/fonts/` are B612 and B612 Mono, subset to the glyphs the page

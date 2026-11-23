@@ -167,7 +167,7 @@ fieldset.col-panel { border: 0; margin: 0; }
 /* The bottom read-outs sit over the graticule's tick labels, so they carry
    the glass behind them. */
 .hud-bl, .hud-br { bottom: 6px; padding: 2px 6px; background: var(--view-bg); }
-.hud-bl { left: 6px; }
+.hud-bl { left: 6px; white-space: pre; }
 .hud-br { right: 6px; text-align: right; max-width: 60%; }
 .instrument:not([data-module="ready"]) .running-only { visibility: hidden; }
 .scale-bar { display: inline-block; height: 5px; border: 1px solid var(--view-dim); border-top: 0; }

@@ -119,11 +119,11 @@ function syncControls() {
   setText("#playBtn", view.running ? "Pause" : "Play");
   setText("#seedNote", text.seed);
   const glassSettings = [`ε ${text.softening}`, `Δt ${text.timestep}`];
-  if (!controls.thetaDisabled) {
+  if (!controls.thetaDisabled && settings.setup !== "kepler") {
     glassSettings.unshift(`θ ${text.theta}`);
   }
-  // En spaces keep the readings apart without a separator glyph.
-  setText("#glassSettings", glassSettings.join("  "));
+  // The glass keeps runs of spaces (white-space: pre) to space the readings.
+  setText("#glassSettings", glassSettings.join("   "));
   showRecord();
 
   $("#simulator").dataset.module = status;
