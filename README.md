@@ -8,7 +8,7 @@ A gravitational N-body simulator in C++20 that uses a Barnes-Hut octree, runs it
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/hero-dark.png">
-  <img alt="The simulator page running a Plummer sphere, with the octree cells, the run record and the conservation meters" src="docs/screenshots/hero-light.png">
+  <img alt="The simulator page running a Plummer sphere, with the octree cells, the settings panel and the conservation meters" src="docs/screenshots/hero-light.png">
 </picture>
 
 ## Method
