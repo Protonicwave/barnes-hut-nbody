@@ -115,8 +115,8 @@ Python call that repeats the run on screen, and three conservation meters:
 the relative energy error, the change in total momentum and the shift of the
 centre of mass, each since the start of the run or the last method change. `web/data/results.json` holds the figures
 it draws, written from `results/` by `python scripts/export_page_data.py`. The
-fonts in `web/fonts/` are Source Serif 4, Source Sans 3 and Source Code Pro
-under the SIL Open Font Licence. Screenshots are in `docs/screenshots/`.
+fonts in `web/fonts/` are B612 and B612 Mono, subset to the glyphs the page
+uses, under the SIL Open Font Licence. Screenshots are in `docs/screenshots/`.
 
 Threads need
 shared memory, and browsers allow that only on a cross-origin isolated page,
