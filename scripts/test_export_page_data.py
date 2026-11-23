@@ -23,7 +23,7 @@ def write_results(directory: Path, drift_rows: str) -> None:
         encoding="utf-8",
     )
     (directory / "machine.txt").write_text(
-        "cpu=Test CPU\nphysical_cores=6\nother=x\n", encoding="utf-8"
+        "cpu=Test CPU\nphysical_cores=6\ncore_mix=2 big and 4 small\nother=x\n", encoding="utf-8"
     )
     (directory / "force_error.csv").write_text(
         "theta,median,p90,p99,max\n0.5,1.234567e-03,2e-3,5.6789e-03,1e-2\n", encoding="utf-8"
