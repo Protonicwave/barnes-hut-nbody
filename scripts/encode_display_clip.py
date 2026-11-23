@@ -47,7 +47,6 @@ class ClipOverLimit(Exception):  # noqa: N818 - names the outcome, not an error 
         )
         self.smallest_bytes = smallest_bytes
         self.smallest_delay_cs = smallest_delay_cs
-        self.limit_bytes = limit_bytes
 
 
 @dataclass(frozen=True, slots=True)
